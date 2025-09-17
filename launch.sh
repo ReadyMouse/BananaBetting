@@ -33,8 +33,8 @@ if ! command_exists node; then
     exit 1
 fi
 
-if ! command_exists npm; then
-    echo -e "${RED}❌ npm is not installed. Please install npm${NC}"
+if ! command_exists npm && ! command_exists pnpm; then
+    echo -e "${RED}❌ Neither npm nor pnpm is installed. Please install npm or pnpm${NC}"
     exit 1
 fi
 
@@ -42,8 +42,8 @@ echo -e "${GREEN}✅ All prerequisites are available${NC}"
 
 # Get the script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BACKEND_DIR="$SCRIPT_DIR/zchat/zchat-backend"
-FRONTEND_DIR="$SCRIPT_DIR/zchat/zchat-frontend"
+BACKEND_DIR="$SCRIPT_DIR/zchat/backend"
+FRONTEND_DIR="$SCRIPT_DIR/zchat/frontend"
 
 # Backend Setup
 echo -e "\n${BLUE}Setting up Backend...${NC}"
@@ -70,7 +70,12 @@ cd "$FRONTEND_DIR"
 # Check if node_modules exists, install if not
 if [ ! -d "node_modules" ]; then
     echo -e "${YELLOW}Installing frontend dependencies...${NC}"
-    npm install
+    # Check if pnpm is available, otherwise use npm
+    if command_exists pnpm; then
+        pnpm install
+    else
+        npm install
+    fi
 fi
 
 # Function to cleanup processes on exit
@@ -101,7 +106,8 @@ cleanup() {
     
     # Kill any remaining processes that might be hanging
     pkill -f "uvicorn app.main:app" 2>/dev/null || true
-    pkill -f "react-scripts start" 2>/dev/null || true
+    pkill -f "next-server" 2>/dev/null || true
+    pkill -f "next dev" 2>/dev/null || true
     
     echo -e "${GREEN}🏁 All servers stopped${NC}"
     exit 0
@@ -123,7 +129,12 @@ sleep 3
 # Start Frontend Server
 echo -e "\n${BLUE}🎨 Starting Frontend Server...${NC}"
 cd "$FRONTEND_DIR"
-npm start &
+# Use the appropriate package manager
+if command_exists pnpm; then
+    pnpm dev &
+else
+    npm run dev &
+fi
 FRONTEND_PID=$!
 
 # Display information

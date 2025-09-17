@@ -109,9 +109,9 @@ def read_users_me(current_user: schemas.UserCreate = Depends(get_current_user)):
 
 @app.post("/register/", response_model=schemas.User)
 def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
-    # cleaners.validate_email(db, email=user.email)
-    # cleaners.validate_username(db, username=user.username)
-    # cleaners.validate_password(db, password=user.password)
+    cleaners.validate_email(db, email=user.email)
+    cleaners.validate_username(db, username=user.username)
+    cleaners.validate_password(db, password=user.password)
     return crud.create_user(db=db, user=user)
 
 @app.get("/users/", response_model=list[schemas.User])
