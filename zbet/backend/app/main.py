@@ -157,3 +157,35 @@ def get_crypto_data(start: str, end: str):
     }
     response = requests.get(url, headers=headers)
     return response.json()
+
+
+# Betting API endpoints
+@app.get("/api/events", response_model=list[schemas.SportEventResponse])
+def get_betting_events(
+    skip: int = 0, 
+    limit: int = 100, 
+    status: str = None,
+    db: Session = Depends(get_db)
+):
+    """Get all betting events with optional status filter"""
+    events = crud.get_sport_events(db, skip=skip, limit=limit, status=status)
+    
+    # Convert events to response format using model's to_dict method
+    response_events = []
+    for event in events:
+        event_data = event.to_dict(db)
+        response_events.append(schemas.SportEventResponse(**event_data))
+    
+    return response_events
+
+
+@app.get("/api/events/{event_id}", response_model=schemas.SportEventResponse)
+def get_betting_event(event_id: int, db: Session = Depends(get_db)):
+    """Get a single betting event by ID"""
+    event = crud.get_sport_event(db, event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    
+    # Convert to response format using model's to_dict method
+    event_data = event.to_dict(db)
+    return schemas.SportEventResponse(**event_data)

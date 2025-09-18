@@ -55,4 +55,18 @@ def create_user(db: Session, user: schemas.UserCreate):
     return db_user
 
 
+# Betting CRUD functions
+def get_sport_events(db: Session, skip: int = 0, limit: int = 100, status: str = None):
+    """Get all sport events with optional status filter"""
+    query = db.query(models.SportEvent)
+    if status:
+        query = query.filter(models.SportEvent.status == status)
+    return query.offset(skip).limit(limit).all()
+
+
+def get_sport_event(db: Session, event_id: int):
+    """Get a single sport event by ID"""
+    return db.query(models.SportEvent).filter(models.SportEvent.id == event_id).first()
+
+
 
