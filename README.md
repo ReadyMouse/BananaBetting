@@ -145,8 +145,30 @@ uvicorn app.main_transactions:app --reload --host 127.0.0.1 --port 8000
 
 You can set these environment variables to customize the setup:
 - `ZCASH_RPC_URL`: Zcash node RPC URL
-- `ZCASH_RPC_USER`: RPC username
+- `ZCASH_RPC_USER`: RPC username  
 - `ZCASH_RPC_PASSWORD`: RPC password
+- `ZCASH_USE_TESTNET`: Set to "true" for testnet, "false" for mainnet (default: "true")
+
+### Testnet Configuration
+
+To use Zcash testnet (recommended for development):
+
+```bash
+export ZCASH_USE_TESTNET=true
+./launch_backend.sh
+```
+
+This will configure the system to:
+- Attempt to connect to a local testnet node at `http://127.0.0.1:18232/`
+- Generate realistic testnet-style mock addresses when no node is available
+- Use testnet format for all addresses (safe for development)
+
+**For Real Testnet Connection:**
+To connect to an actual Zcash testnet node, you can:
+1. Set up a local testnet node
+2. Use a custom RPC URL: `export ZCASH_RPC_URL="your_testnet_rpc_url"`
+
+**Note**: The system defaults to testnet mode for safe development. To use mainnet, set `ZCASH_USE_TESTNET=false`.
 
 ## 🛡️ Security Notes
 

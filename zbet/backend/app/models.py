@@ -38,6 +38,14 @@ class BetOutcome(enum.Enum):
     PUSH = "push" # neither win or lose, stalemate, tie, etc. 
 
 
+class DepositStatus(enum.Enum):
+    PENDING = "pending"         # Bet created, waiting for deposit
+    CONFIRMING = "confirming"   # Deposit received, waiting for confirmations
+    CONFIRMED = "confirmed"     # Deposit fully confirmed, bet is active
+    FAILED = "failed"          # Deposit failed or insufficient
+    EXPIRED = "expired"        # Deposit window expired
+
+
 class EventCategory(enum.Enum):
     BASEBALL = "baseball"
     BANANA_ANTICS = "banana-antics"
@@ -188,6 +196,12 @@ class Bet(Base):
     # System-agnostic betting metadata (JSON field for flexibility)
     betting_metadata = Column(Text, nullable=True)  # JSON string for system-specific data
     
+    # Deposit tracking
+    deposit_address = Column(String(100), nullable=True)  # Shielded address where user should send ZEC
+    deposit_status = Column(Enum(DepositStatus), default=DepositStatus.PENDING, nullable=False)
+    deposit_confirmed_at = Column(DateTime, nullable=True)  # When deposit was confirmed
+    deposit_expires_at = Column(DateTime, nullable=True)  # When deposit window expires
+    
     # Transaction details
     zcash_transaction_id = Column(String(100), nullable=True)  # Transaction hash for placing bet
     bet_placed_at = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -223,6 +237,16 @@ class Bet(Base):
         metadata = self.get_betting_metadata()
         metadata['pari_mutuel_pool_id'] = pool_id
         self.set_betting_metadata(metadata)
+    
+    def is_active(self):
+        """Check if bet is active (deposit confirmed and event not settled)"""
+        return self.deposit_status == DepositStatus.CONFIRMED and self.outcome is None
+    
+    def can_accept_deposits(self):
+        """Check if bet can still accept deposits"""
+        if self.deposit_expires_at and datetime.utcnow() > self.deposit_expires_at:
+            return False
+        return self.deposit_status in [DepositStatus.PENDING, DepositStatus.CONFIRMING]
 
 
 class Payout(Base):

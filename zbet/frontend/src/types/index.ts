@@ -6,6 +6,7 @@ export interface User {
   is_active: boolean;
   zcash_account?: string;
   zcash_address?: string;
+  zcash_transparent_address?: string;
   balance?: string;
 }
 

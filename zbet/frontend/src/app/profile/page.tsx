@@ -37,10 +37,11 @@ export default function ProfilePage() {
     setEmoji(getRandomBananaEmoji());
   }, []);
 
-  // Mock wallet data - would come from API
+  // Real wallet data from authenticated user
   const walletData = {
-    address: user?.zcash_address || 'zs1banana123example456address789here',
-    balance: parseFloat(user?.balance || '0.12345678'),
+    shieldedAddress: user?.zcash_address || 'Not available',
+    transparentAddress: user?.zcash_transparent_address || 'Not available',
+    balance: parseFloat(user?.balance || '0'),
     isConnected: !!user?.zcash_address,
     transactions: [
       { id: '1', type: 'win', amount: 0.05, date: '2024-01-15', description: 'Banana throw bet - WON!' },
@@ -94,14 +95,15 @@ export default function ProfilePage() {
     alert('Copied to clipboard! 📋');
   };
 
-  const connectWallet = () => {
-    // In a real app, this would initiate wallet connection
-    alert('Connecting wallet... 🍌');
-  };
-
-  const refreshBalance = () => {
+  const refreshBalance = async () => {
     // In a real app, this would refresh the balance from the API
-    alert('Refreshing balance... 🔄');
+    try {
+      // You could implement an API call here to refresh user data
+      alert('Balance refresh coming soon! 🔄');
+    } catch (error) {
+      console.error('Failed to refresh balance:', error);
+      alert('Failed to refresh balance. Please try again.');
+    }
   };
 
   return (
@@ -282,45 +284,84 @@ export default function ProfilePage() {
                     </div>
                   </div>
 
-                  {/* Wallet Address */}
-                  <div className="mb-6">
-                    <label className="block text-sm font-medium text-baseball-700 mb-2">
-                      Wallet Address
-                    </label>
-                    <div className="flex items-center space-x-2">
-                      <div className="flex-1 px-4 py-3 bg-gray-50 border border-banana-300 rounded-lg">
-                        <p className="font-mono text-sm">
-                          {showAddress ? walletData.address : '••••••••••••••••••••••••••••••••••••'}
-                        </p>
+                  {/* Wallet Addresses */}
+                  <div className="mb-6 space-y-4">
+                    {/* Shielded Address */}
+                    <div>
+                      <label className="block text-sm font-medium text-baseball-700 mb-2">
+                        Shielded Address (Private)
+                      </label>
+                      <div className="flex items-center space-x-2">
+                        <div className="flex-1 px-4 py-3 bg-gray-50 border border-banana-300 rounded-lg">
+                          <p className="font-mono text-sm text-gray-800">
+                            {showAddress ? walletData.shieldedAddress : '••••••••••••••••••••••••••••••••••••'}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => setShowAddress(!showAddress)}
+                          className="p-3 bg-banana-500 text-white rounded-lg hover:bg-banana-600 transition-colors"
+                        >
+                          {showAddress ? <EyeOff size={20} /> : <Eye size={20} />}
+                        </button>
+                        <button
+                          onClick={() => copyToClipboard(walletData.shieldedAddress)}
+                          className="p-3 bg-grass-500 text-white rounded-lg hover:bg-grass-600 transition-colors"
+                        >
+                          <Copy size={20} />
+                        </button>
                       </div>
-                      <button
-                        onClick={() => setShowAddress(!showAddress)}
-                        className="p-3 bg-banana-500 text-white rounded-lg hover:bg-banana-600 transition-colors"
-                      >
-                        {showAddress ? <EyeOff size={20} /> : <Eye size={20} />}
-                      </button>
-                      <button
-                        onClick={() => copyToClipboard(walletData.address)}
-                        className="p-3 bg-grass-500 text-white rounded-lg hover:bg-grass-600 transition-colors"
-                      >
-                        <Copy size={20} />
-                      </button>
                     </div>
+
+                    {/* Transparent Address */}
+                    <div>
+                      <label className="block text-sm font-medium text-baseball-700 mb-2">
+                        Transparent Address (Public)
+                      </label>
+                      <div className="flex items-center space-x-2">
+                        <div className="flex-1 px-4 py-3 bg-gray-50 border border-banana-300 rounded-lg">
+                          <p className="font-mono text-sm text-gray-800">
+                            {showAddress ? walletData.transparentAddress : '••••••••••••••••••••••••••••••••••••'}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => copyToClipboard(walletData.transparentAddress)}
+                          className="p-3 bg-grass-500 text-white rounded-lg hover:bg-grass-600 transition-colors"
+                        >
+                          <Copy size={20} />
+                        </button>
+                      </div>
+                    </div>
+
                   </div>
 
                   {/* Connection Status */}
                   <div className="mb-6">
-                    <div className="flex items-center justify-between p-4 bg-grass-50 border border-grass-200 rounded-lg">
+                    <div className={cn(
+                      "flex items-center justify-between p-4 border rounded-lg",
+                      walletData.isConnected 
+                        ? "bg-grass-50 border-grass-200"
+                        : "bg-red-50 border-red-200"
+                    )}>
                       <div className="flex items-center space-x-3">
-                        <div className="w-3 h-3 bg-grass-500 rounded-full"></div>
-                        <span className="font-medium text-grass-800">Wallet Connected</span>
+                        <div className={cn(
+                          "w-3 h-3 rounded-full",
+                          walletData.isConnected ? "bg-grass-500" : "bg-red-500"
+                        )}></div>
+                        <span className={cn(
+                          "font-medium",
+                          walletData.isConnected ? "text-grass-800" : "text-red-800"
+                        )}>
+                          {walletData.isConnected ? "Wallet Connected" : "Wallet Not Available"}
+                        </span>
                       </div>
-                      <button
-                        onClick={connectWallet}
-                        className="px-4 py-2 bg-grass-500 text-white rounded-lg hover:bg-grass-600 transition-colors"
-                      >
-                        Reconnect
-                      </button>
+                      {walletData.isConnected && (
+                        <button
+                          onClick={refreshBalance}
+                          className="px-4 py-2 bg-grass-500 text-white rounded-lg hover:bg-grass-600 transition-colors"
+                        >
+                          Refresh
+                        </button>
+                      )}
                     </div>
                   </div>
 

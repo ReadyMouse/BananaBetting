@@ -275,3 +275,210 @@ def z_getoperationstatus(operation_ids: list = None):
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+def z_getbalance(account: int = None, minconf: int = 1, include_watchonly: bool = False):
+    """
+    Get the shielded balance for an account.
+    This is used to check shielded ZEC balances.
+    
+    Args:
+        account: Account number (None for all accounts)
+        minconf: Minimum confirmations required (default: 1)
+        include_watchonly: Include watch-only addresses
+    
+    Returns:
+        Shielded balance amount
+    """
+    try:
+        params = []
+        if account is not None:
+            params.append(account)
+            if minconf != 1:
+                params.append(minconf)
+                if include_watchonly:
+                    params.append(include_watchonly)
+        
+        payload = {
+            "jsonrpc": "1.0",
+            "id": "z_getbalance",
+            "method": "z_getbalance",
+            "params": params
+        }
+        
+        response = requests.post(ZCASH_RPC_URL, json=payload, auth=(ZCASH_RPC_USER, ZCASH_RPC_PASSWORD))
+        
+        if response.status_code != 200:
+            print(response.json())
+            raise HTTPException(status_code=500, detail="Failed to connect to Zcash node")
+
+        result = response.json()
+        return float(result['result'])
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def z_listreceivedbyaddress(address: str, minconf: int = 1):
+    """
+    List amounts received by a specific shielded address.
+    This is used to verify shielded deposits for betting.
+    
+    Args:
+        address: The shielded address to check
+        minconf: Minimum confirmations required (default: 1)
+    
+    Returns:
+        List of received amounts and transaction details
+    """
+    try:
+        payload = {
+            "jsonrpc": "1.0",
+            "id": "z_listreceivedbyaddress",
+            "method": "z_listreceivedbyaddress",
+            "params": [address, minconf]
+        }
+        
+        response = requests.post(ZCASH_RPC_URL, json=payload, auth=(ZCASH_RPC_USER, ZCASH_RPC_PASSWORD))
+        
+        if response.status_code != 200:
+            print(response.json())
+            raise HTTPException(status_code=500, detail="Failed to connect to Zcash node")
+
+        result = response.json()
+        return result['result']
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def list_transactions(account: str = "*", count: int = 10, skip: int = 0):
+    """
+    List recent transactions for an account or all accounts.
+    Used to find specific deposit transactions.
+    
+    Args:
+        account: Account name or "*" for all accounts
+        count: Number of transactions to return
+        skip: Number of transactions to skip
+    
+    Returns:
+        List of transaction objects
+    """
+    try:
+        payload = {
+            "jsonrpc": "1.0",
+            "id": "listtransactions",
+            "method": "listtransactions",
+            "params": [account, count, skip]
+        }
+        
+        response = requests.post(ZCASH_RPC_URL, json=payload, auth=(ZCASH_RPC_USER, ZCASH_RPC_PASSWORD))
+        
+        if response.status_code != 200:
+            print(response.json())
+            raise HTTPException(status_code=500, detail="Failed to connect to Zcash node")
+
+        result = response.json()
+        return result['result']
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def get_transaction(txid: str):
+    """
+    Get detailed information about a specific transaction.
+    
+    Args:
+        txid: Transaction ID to look up
+    
+    Returns:
+        Transaction details including confirmations
+    """
+    try:
+        payload = {
+            "jsonrpc": "1.0",
+            "id": "gettransaction",
+            "method": "gettransaction",
+            "params": [txid]
+        }
+        
+        response = requests.post(ZCASH_RPC_URL, json=payload, auth=(ZCASH_RPC_USER, ZCASH_RPC_PASSWORD))
+        
+        if response.status_code != 200:
+            print(response.json())
+            raise HTTPException(status_code=500, detail="Failed to connect to Zcash node")
+
+        result = response.json()
+        return result['result']
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def verify_shielded_deposit(address: str, expected_amount: float, min_confirmations: int = 6):
+    """
+    Verify that a shielded deposit of the expected amount has been received at an address.
+    This is the main function for confirming shielded bet deposits.
+    
+    Args:
+        address: The shielded address to check for deposits
+        expected_amount: The amount we expect to receive
+        min_confirmations: Minimum confirmations required
+    
+    Returns:
+        Dict with verification status and details
+    """
+    try:
+        # Get transactions received with minimum confirmations
+        confirmed_txs = z_listreceivedbyaddress(address, min_confirmations)
+        
+        # Get all transactions (including unconfirmed)
+        all_txs = z_listreceivedbyaddress(address, 0)
+        
+        # Calculate total amounts
+        confirmed_amount = sum(float(tx.get('amount', 0)) for tx in confirmed_txs)
+        total_amount = sum(float(tx.get('amount', 0)) for tx in all_txs)
+        
+        # Check if we have enough confirmed funds
+        if confirmed_amount >= expected_amount:
+            return {
+                "status": "confirmed",
+                "confirmed_amount": confirmed_amount,
+                "total_amount": total_amount,
+                "confirmations": min_confirmations,
+                "transactions": confirmed_txs,
+                "message": f"Shielded deposit confirmed: {confirmed_amount} ZEC received"
+            }
+        
+        # Check if we have unconfirmed funds
+        elif total_amount >= expected_amount:
+            pending_amount = total_amount - confirmed_amount
+            return {
+                "status": "pending",
+                "confirmed_amount": confirmed_amount,
+                "total_amount": total_amount,
+                "pending_amount": pending_amount,
+                "confirmations": 0,
+                "transactions": all_txs,
+                "message": f"Shielded deposit pending confirmation: {total_amount} ZEC received, {pending_amount} ZEC awaiting {min_confirmations} confirmations"
+            }
+        
+        # Not enough funds received
+        else:
+            return {
+                "status": "insufficient", 
+                "confirmed_amount": confirmed_amount,
+                "total_amount": total_amount,
+                "expected_amount": expected_amount,
+                "transactions": all_txs,
+                "message": f"Insufficient shielded funds: expected {expected_amount} ZEC, received {total_amount} ZEC"
+            }
+    
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e),
+            "message": f"Error checking shielded deposit: {str(e)}"
+        }
