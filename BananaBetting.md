@@ -19,7 +19,7 @@ Inspired by the Savanah Bannanas and Banana-ball, the dancing alternative to bas
 ### ✅ **Already Available Components**
 
 #### 1. **User Management System** 
-- **Location**: `zchat/backend/app/models.py`, `crud.py`, `auth.py`
+- **Location**: `zbet/backend/app/models.py`, `crud.py`, `auth.py`
 - **Features**:
   - JWT authentication with email/username/password
   - Secure password hashing (bcrypt)

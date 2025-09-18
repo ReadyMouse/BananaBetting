@@ -206,7 +206,7 @@ export default function Home() {
           className="text-center mt-12 p-6 bg-white/50 backdrop-blur-sm rounded-2xl border border-banana-200"
         >
           <p className="text-baseball-600 italic">
-            "Baseball is 90% fun, 10% skill, and 100% bananas!" 🎭⚾🍌
+            "Banana-ball is 90% fun, 10% skill, and 100% bananas!"
           </p>
         </motion.div>
       </div>

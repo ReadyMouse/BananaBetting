@@ -42,8 +42,8 @@ echo -e "${GREEN}✅ All prerequisites are available${NC}"
 
 # Get the script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BACKEND_DIR="$SCRIPT_DIR/zchat/backend"
-FRONTEND_DIR="$SCRIPT_DIR/zchat/frontend"
+BACKEND_DIR="$SCRIPT_DIR/zbet/backend"
+FRONTEND_DIR="$SCRIPT_DIR/zbet/frontend"
 
 # Backend Setup
 echo -e "\n${BLUE}Setting up Backend...${NC}"

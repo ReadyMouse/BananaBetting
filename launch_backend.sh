@@ -32,7 +32,7 @@ echo -e "${GREEN}✅ Python 3 is available${NC}"
 
 # Get the script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BACKEND_DIR="$SCRIPT_DIR/zchat/backend"
+BACKEND_DIR="$SCRIPT_DIR/zbet/backend"
 
 # Backend Setup
 echo -e "\n${BLUE}Setting up Backend...${NC}"

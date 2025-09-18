@@ -20,7 +20,7 @@ A secure, authenticated API for Zcash transactions built with FastAPI. This API 
 ## ⚙️ Zcash Node Configuration
 
 Ensure your Zcash node is configured with RPC access. Update the credentials in:
-`zchat/backend/app/zcash_mod/__init__.py`
+`zbet/backend/app/zcash_mod/__init__.py`
 
 ```python
 ZCASH_RPC_USER = "your_rpc_username"
@@ -111,7 +111,7 @@ curl -X GET "http://localhost:8000/zcash/balance/" \
 
 ```
 zcash-transaction-api/
-├── zchat/backend/
+├── zbet/backend/
 │   ├── app/
 │   │   ├── zcash_mod/          # Zcash integration
 │   │   │   ├── zcash_wallet.py # Wallet operations
@@ -134,7 +134,7 @@ zcash-transaction-api/
 ### Manual Setup
 
 ```bash
-cd zchat/backend
+cd zbet/backend
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt

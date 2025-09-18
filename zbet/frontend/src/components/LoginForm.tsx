@@ -187,7 +187,7 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
                 <input
                   {...loginForm.register('username')}
                   type="text"
-                  className="w-full px-4 py-3 border border-banana-300 rounded-lg focus:ring-2 focus:ring-banana-500 focus:border-banana-500 transition-colors"
+                  className="w-full px-4 py-3 border border-banana-300 rounded-lg focus:ring-2 focus:ring-banana-500 focus:border-banana-500 transition-colors text-black"
                   placeholder="Enter your username"
                 />
                 {loginForm.formState.errors.username && (
@@ -205,7 +205,7 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
                   <input
                     {...loginForm.register('password')}
                     type={showPassword ? 'text' : 'password'}
-                    className="w-full px-4 py-3 pr-12 border border-banana-300 rounded-lg focus:ring-2 focus:ring-banana-500 focus:border-banana-500 transition-colors"
+                    className="w-full px-4 py-3 pr-12 border border-banana-300 rounded-lg focus:ring-2 focus:ring-banana-500 focus:border-banana-500 transition-colors text-black"
                     placeholder="Enter your password"
                   />
                   <button
