@@ -110,6 +110,28 @@ body {
   font-weight: 400;
 }
 
+/* Universal input styling for better text visibility */
+input[type="text"],
+input[type="email"], 
+input[type="password"],
+input[type="number"],
+input[type="search"],
+textarea,
+select {
+  color: var(--baseball-800) !important;
+  font-weight: 500 !important;
+}
+
+input[type="text"]::placeholder,
+input[type="email"]::placeholder,
+input[type="password"]::placeholder, 
+input[type="number"]::placeholder,
+input[type="search"]::placeholder,
+textarea::placeholder {
+  color: var(--baseball-500) !important;
+  font-weight: 400 !important;
+}
+
 /* Fun banana-themed utilities */
 .banana-gradient {
   background: linear-gradient(135deg, var(--banana-300), var(--banana-500), var(--banana-700));

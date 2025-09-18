@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Filter, TrendingUp, Clock, DollarSign, Zap } from 'lucide-react';
 import { cn, getRandomBananaEmoji } from '@/lib/utils';
@@ -256,6 +257,7 @@ const categories = [
 ];
 
 export default function BettingPage() {
+  const router = useRouter();
   const [emoji, setEmoji] = useState('🍌');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -322,8 +324,8 @@ export default function BettingPage() {
     });
 
   const handlePlaceBet = (betId: string) => {
-    // This would open a betting modal in a real app
-    alert(`Placing bet on ${betId}! 🍌`);
+    // Navigate to the individual bet page
+    router.push(`/betting/${betId}`);
   };
 
   // Loading state
@@ -465,6 +467,7 @@ export default function BettingPage() {
                 exit={{ opacity: 0, scale: 0.9 }}
                 transition={{ delay: index * 0.05 }}
                 whileHover={{ scale: 1.02 }}
+                onClick={() => router.push(`/betting/${bet.id}`)}
                 className="bg-white/90 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-banana-200 group cursor-pointer"
               >
                 {/* Card Header */}
@@ -549,7 +552,10 @@ export default function BettingPage() {
 
                 {/* Action Button */}
                 <motion.button
-                  onClick={() => handlePlaceBet(bet.id)}
+                  onClick={(e) => {
+                    e.stopPropagation(); // Prevent card click from firing
+                    handlePlaceBet(bet.id);
+                  }}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   className="w-full bg-banana-500 hover:bg-banana-600 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2"

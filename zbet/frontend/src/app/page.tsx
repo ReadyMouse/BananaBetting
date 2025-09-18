@@ -109,6 +109,7 @@ export default function Home() {
           const displayData = getHomepageDisplayData(event.betting_system_type, systemData);
           
           return {
+            id: event.id,
             title: event.title,
             bettingSystemType: event.betting_system_type,
             displayData: displayData,
@@ -119,71 +120,11 @@ export default function Home() {
         
         setFeaturedBets(transformed);
       } else {
-        // Fallback to mock data if API fails
-        setFeaturedBets([
-          {
-            title: "Will a banana be thrown onto the field?",
-            bettingSystemType: "pari_mutuel",
-            displayData: {
-              primaryLabel: "Total Pool",
-              primaryValue: "0.1500 ZEC",
-              secondaryLabel: "Leading",
-              secondaryValue: "65%",
-              description: "Yes, bananas will fly!",
-              poolCount: 2
-            },
-            emoji: "🍌",
-            category: "Banana Antics"
-          },
-          {
-            title: "Number of dancing players during warmup",
-            bettingSystemType: "fixed_odds",
-            displayData: {
-              primaryLabel: "Odds",
-              primaryValue: "3.2x",
-              secondaryLabel: "Payout",
-              secondaryValue: "0.0032 ZEC",
-              description: "Fixed odds betting",
-              poolCount: 1
-            },
-            emoji: "💃",
-            category: "Player Props"
-          },
-          {
-            title: "Crowd size doing the wave",
-            bettingSystemType: "spread",
-            displayData: {
-              primaryLabel: "Spread",
-              primaryValue: "+5.5",
-              secondaryLabel: "Over",
-              secondaryValue: "1.9x",
-              description: "Point spread betting",
-              poolCount: 2
-            },
-            emoji: "🌊",
-            category: "Crowd Fun"
-          }
-        ]);
+        setFeaturedBets([]);
       }
     } catch (error) {
       console.error('Failed to fetch featured bets:', error);
-      // Use fallback data
-      setFeaturedBets([
-        {
-          title: "Will a banana be thrown onto the field?",
-          bettingSystemType: "pari_mutuel",
-          displayData: {
-            primaryLabel: "Total Pool",
-            primaryValue: "0.1200 ZEC",
-            secondaryLabel: "Leading",
-            secondaryValue: "60%",
-            description: "Yes, bananas will fly!",
-            poolCount: 2
-          },
-          emoji: "🍌",
-          category: "Banana Antics"
-        }
-      ]);
+      setFeaturedBets([]);
     } finally {
       setBetsLoading(false);
     }
@@ -319,7 +260,7 @@ export default function Home() {
                   </div>
                 </div>
               ))
-            ) : (
+            ) : featuredBets.length > 0 ? (
               featuredBets.map((bet, index) => (
               <motion.div
                 key={index}
@@ -327,7 +268,8 @@ export default function Home() {
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 0.4 + index * 0.1 }}
                 whileHover={{ scale: 1.05 }}
-                className="bg-white/90 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-banana-200 cursor-pointer group"
+                  onClick={() => router.push(`/betting/${bet.id}`)}
+                  className="bg-white/90 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-banana-200 cursor-pointer group"
               >
                 <div className="text-center mb-4">
                   <div className="text-4xl mb-2 group-hover:scale-110 transition-transform">
@@ -357,6 +299,14 @@ export default function Home() {
                 </div>
               </motion.div>
               ))
+            ) : (
+              <div className="col-span-full flex flex-col items-center justify-center py-12">
+                <div className="text-6xl mb-4">🍌</div>
+                <h3 className="text-xl font-semibold text-baseball-600 mb-2">No bets available</h3>
+                <p className="text-baseball-500 text-center">
+                  Check back later for exciting betting opportunities!
+                </p>
+              </div>
             )}
           </div>
         </motion.section>
