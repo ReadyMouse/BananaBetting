@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { TrendingUp, Search, Users, Trophy, Zap, Star } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { getRandomBananaEmoji } from '@/lib/utils';
+import Disclaimer from '@/components/Disclaimer';
 
 // API Configuration
 const API_BASE_URL = 'http://localhost:8000';
@@ -348,9 +349,10 @@ export default function Home() {
           transition={{ delay: 0.8 }}
           className="text-center mt-12 p-6 bg-white/50 backdrop-blur-sm rounded-2xl border border-banana-200"
         >
-          <p className="text-baseball-600 italic">
+          <p className="text-baseball-600 italic mb-4">
             "Banana-ball is 90% fun, 10% skill, and 100% bananas!"
           </p>
+          <Disclaimer />
         </motion.div>
       </div>
     </div>

@@ -33,32 +33,20 @@ def create_user(db: Session, user: schemas.UserCreate):
     # zcash_utils.validate_zcash_address('address')
     # zcash_wallet.send_to_address('address', 0.1)
     
-    # Development mode: Create mock Zcash data when node is not available
+    # Create real Zcash addresses - fail if node is not available
     try:
         zcash_account = zcash_wallet.z_get_new_account()
         zcash_address = zcash_wallet.z_getaddressforaccount(zcash_account)
         zcash_transparent_address = zcash_wallet.z_listunifiedreceivers(zcash_address, 'p2pkh')
         zcash_transparent_balance = str(zcash_wallet.get_transparent_address_balance(zcash_transparent_address))
     except Exception as e:
-        # Fallback for development when Zcash node is not running
-        import uuid
-        from .zcash_mod import USE_TESTNET
-        
-        # Generate more realistic-looking mock addresses
-        random_suffix = uuid.uuid4().hex
-        zcash_account = f"dev_account_{random_suffix[:8]}"
-        
-        if USE_TESTNET:
-            # Testnet address format (more realistic length)
-            zcash_address = f"ztestsapling1{random_suffix[:50]}"
-            zcash_transparent_address = f"tm{random_suffix[:32]}"
-        else:
-            # Mainnet address format (more realistic length)  
-            zcash_address = f"zs1{random_suffix[:75]}"
-            zcash_transparent_address = f"t1{random_suffix[:32]}"
-            
-        zcash_transparent_balance = "0.0"
-        print(f"Warning: Using mock Zcash data for development ({('testnet' if USE_TESTNET else 'mainnet')}) - {str(e)}")
+        from .zcash_mod import ZCASH_RPC_URL
+        raise HTTPException(
+            status_code=503, 
+            detail=f"Failed to connect to Zcash node at {ZCASH_RPC_URL}. "
+                   f"Please ensure the Zcash node is running and accessible. "
+                   f"Error: {str(e)}"
+        )
     
     db_user = models.User(email=user.email.lower(), username=user.username.lower(), zcash_account=zcash_account, zcash_address=zcash_address, zcash_transparent_address=zcash_transparent_address, hashed_password=hashed_password, balance=zcash_transparent_balance)
     db.add(db_user)

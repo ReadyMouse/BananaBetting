@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Trophy, Clock, TrendingUp, CheckCircle, XCircle, DollarSign, Calendar, Filter } from 'lucide-react';
 import { cn, getRandomBananaEmoji, formatCurrency } from '@/lib/utils';
+import Disclaimer from '@/components/Disclaimer';
 
 // Mock data for user bets
 const mockUserBets = [
@@ -396,9 +397,10 @@ export default function MyBetsPage() {
           transition={{ delay: 0.6 }}
           className="text-center mt-12 p-6 bg-white/50 backdrop-blur-sm rounded-2xl border border-banana-200"
         >
-          <p className="text-baseball-600 italic">
+          <p className="text-baseball-600 italic mb-4">
             "Every bet is an adventure, every win is a celebration!" 🎉⚾🍌
           </p>
+          <Disclaimer />
         </motion.div>
       </div>
     </div>

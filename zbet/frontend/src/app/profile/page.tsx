@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { cn, formatZcash, getRandomBananaEmoji } from '@/lib/utils';
+import Disclaimer from '@/components/Disclaimer';
 
 export default function ProfilePage() {
   const { user, logout } = useAuth();
@@ -537,9 +538,10 @@ export default function ProfilePage() {
           transition={{ delay: 0.6 }}
           className="text-center mt-12 p-6 bg-white/50 backdrop-blur-sm rounded-2xl border border-banana-200"
         >
-          <p className="text-baseball-600 italic">
+          <p className="text-baseball-600 italic mb-4">
             "Stay secure, have fun, and keep those bananas coming!"
           </p>
+          <Disclaimer />
         </motion.div>
       </div>
     </div>

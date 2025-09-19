@@ -194,3 +194,6 @@ alembic.ini
 
 # Virtual environment (already covered above but being explicit)
 zchat/backend/venv/
+
+# Code for reference
+zchat*

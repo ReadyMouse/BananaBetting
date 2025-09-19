@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Clock, TrendingUp, DollarSign, Users } from 'lucide-react';
 import { cn, getRandomBananaEmoji } from '@/lib/utils';
+import Disclaimer from '@/components/Disclaimer';
 
 // API Configuration
 const API_BASE_URL = 'http://localhost:8000';
@@ -464,6 +465,19 @@ export default function IndividualBettingPage() {
             </div>
           </motion.div>
         </div>
+
+        {/* Fun Footer */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.8 }}
+          className="text-center mt-12 p-6 bg-white/50 backdrop-blur-sm rounded-2xl border border-banana-200"
+        >
+          <p className="text-baseball-600 italic mb-4">
+            "Place your bets and let the banana magic happen!" 🍌⚾🎪
+          </p>
+          <Disclaimer />
+        </motion.div>
       </div>
     </div>
   );
