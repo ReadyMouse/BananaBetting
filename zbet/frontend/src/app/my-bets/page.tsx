@@ -1,110 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Trophy, Clock, TrendingUp, CheckCircle, XCircle, DollarSign, Calendar, Filter } from 'lucide-react';
+import { Trophy, Clock, TrendingUp, CheckCircle, XCircle, DollarSign, Calendar, Filter, ExternalLink } from 'lucide-react';
 import { cn, getRandomBananaEmoji, formatCurrency } from '@/lib/utils';
+import { bettingApi } from '@/lib/api';
+import { useAuth } from '@/hooks/useAuth';
 import Disclaimer from '@/components/Disclaimer';
 
-// Mock data for user bets
-const mockUserBets = [
-  {
-    id: '1',
-    betId: 'bet-001',
-    bet: {
-      title: 'Will a banana be thrown onto the field?',
-      description: 'Classic Savannah Bananas tradition',
-      category: 'banana-antics',
-      emoji: '🍌'
-    },
-    amount: 0.05,
-    odds: 2.5,
-    potentialPayout: 0.125,
-    status: 'pending',
-    placedAt: '2024-01-15T14:30:00Z',
-    settledAt: null
-  },
-  {
-    id: '2',
-    betId: 'bet-002',
-    bet: {
-      title: 'First fan to wear banana costume',
-      description: 'Which inning will we spot the first fan?',
-      category: 'crowd-fun',
-      emoji: '🎭'
-    },
-    amount: 0.02,
-    odds: 1.8,
-    potentialPayout: 0.036,
-    status: 'won',
-    placedAt: '2024-01-14T16:45:00Z',
-    settledAt: '2024-01-14T19:30:00Z'
-  },
-  {
-    id: '3',
-    betId: 'bet-003',
-    bet: {
-      title: 'Number of dancing players during warmup',
-      description: 'How many players will be caught dancing?',
-      category: 'player-props',
-      emoji: '💃'
-    },
-    amount: 0.1,
-    odds: 3.2,
-    potentialPayout: 0.32,
-    status: 'lost',
-    placedAt: '2024-01-13T12:15:00Z',
-    settledAt: '2024-01-13T15:45:00Z'
-  },
-  {
-    id: '4',
-    betId: 'bet-004',
-    bet: {
-      title: 'Pitcher does the cha-cha',
-      description: 'Will the starting pitcher perform the cha-cha?',
-      category: 'player-props',
-      emoji: '🕺'
-    },
-    amount: 0.03,
-    odds: 4.1,
-    potentialPayout: 0.123,
-    status: 'pending',
-    placedAt: '2024-01-15T10:20:00Z',
-    settledAt: null
-  },
-  {
-    id: '5',
-    betId: 'bet-005',
-    bet: {
-      title: 'Home run celebration dance',
-      description: 'What type of celebration dance will follow?',
-      category: 'baseball',
-      emoji: '⚾'
-    },
-    amount: 0.08,
-    odds: 2.9,
-    potentialPayout: 0.232,
-    status: 'won',
-    placedAt: '2024-01-12T13:30:00Z',
-    settledAt: '2024-01-12T17:15:00Z'
-  },
-  {
-    id: '6',
-    betId: 'bet-006',
-    bet: {
-      title: 'Crowd noise level (decibels)',
-      description: 'Will the crowd noise exceed 120 decibels?',
-      category: 'crowd-fun',
-      emoji: '📢'
-    },
-    amount: 0.015,
-    odds: 1.6,
-    potentialPayout: 0.024,
-    status: 'cancelled',
-    placedAt: '2024-01-11T11:00:00Z',
-    settledAt: '2024-01-11T11:30:00Z'
-  }
-];
 
 const statusColors = {
   pending: 'bg-banana-100 text-banana-800 border-banana-300',
@@ -121,12 +25,71 @@ const statusIcons = {
 };
 
 export default function MyBetsPage() {
+  const { user, isAuthenticated, loading: authLoading } = useAuth();
+  const router = useRouter();
   const [filter, setFilter] = useState('all'); // all, pending, won, lost, cancelled
   const [sortBy, setSortBy] = useState('newest'); // newest, oldest, amount
   const [mounted, setMounted] = useState(false);
   const [buttonEmoji, setButtonEmoji] = useState('🍌');
+  const [userBets, setUserBets] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const filteredBets = mockUserBets
+  // Function to get emoji from category
+  const getCategoryEmoji = (category: string) => {
+    const emojiMap: Record<string, string> = {
+      'banana-antics': '🍌',
+      'player-props': '⚾',
+      'crowd-fun': '🎭',
+      'baseball': '⚾',
+      'other': '🎪'
+    };
+    return emojiMap[category] || '🎪';
+  };
+
+  // Function to transform backend bet to frontend format
+  const transformBetData = (bet: any) => {
+    return {
+      id: bet.id.toString(),
+      betId: bet.betId,
+      bet: {
+        id: bet.bet.id, // Include the sport event ID for navigation
+        title: bet.bet.title,
+        description: bet.bet.description,
+        category: bet.bet.category,
+        emoji: getCategoryEmoji(bet.bet.category)
+      },
+      amount: bet.amount,
+      potentialPayout: bet.potentialPayout ?? 0,
+      status: bet.status,
+      placedAt: bet.placedAt,
+      settledAt: bet.settledAt
+    };
+  };
+
+  const fetchUserBets = async () => {
+    if (!isAuthenticated) {
+      setUserBets([]);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      const bets = await bettingApi.getUserBets();
+      const transformedBets = bets.map(transformBetData);
+      setUserBets(transformedBets);
+    } catch (err) {
+      console.error('Failed to fetch user bets:', err);
+      setError('Failed to load your bets. Please try again.');
+      setUserBets([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredBets = userBets
     .filter(bet => filter === 'all' || bet.status === filter)
     .sort((a, b) => {
       switch (sortBy) {
@@ -142,19 +105,30 @@ export default function MyBetsPage() {
 
   // Calculate stats
   const stats = {
-    totalBets: mockUserBets.length,
-    pendingBets: mockUserBets.filter(bet => bet.status === 'pending').length,
-    wonBets: mockUserBets.filter(bet => bet.status === 'won').length,
-    totalWinnings: mockUserBets
+    totalBets: userBets.length,
+    pendingBets: userBets.filter(bet => bet.status === 'pending').length,
+    wonBets: userBets.filter(bet => bet.status === 'won').length,
+    totalWinnings: userBets
       .filter(bet => bet.status === 'won')
       .reduce((total, bet) => total + bet.potentialPayout, 0),
-    totalWagered: mockUserBets.reduce((total, bet) => total + bet.amount, 0)
+    totalWagered: userBets.reduce((total, bet) => total + bet.amount, 0)
   };
 
   useEffect(() => {
     setMounted(true);
     setButtonEmoji(getRandomBananaEmoji());
   }, []);
+
+  useEffect(() => {
+    if (!authLoading) {
+      fetchUserBets();
+    }
+  }, [isAuthenticated, authLoading]);
+
+  const handleBetClick = (betId: string) => {
+    // Navigate to the betting event's statistics page
+    router.push(`/betting/${betId}`);
+  };
 
   const formatDate = (dateString: string) => {
     // Use a more deterministic format to avoid hydration mismatches
@@ -166,6 +140,42 @@ export default function MyBetsPage() {
     const minutes = date.getMinutes().toString().padStart(2, '0');
     return `${month} ${day}, ${hours}:${minutes}`;
   };
+
+  // Show loading state while auth is loading
+  if (authLoading || !mounted) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-banana-50 via-banana-100 to-grass-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-6xl mb-4">🍌</div>
+          <p className="text-xl text-banana-800">Loading your bets...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show login prompt if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-banana-50 via-banana-100 to-grass-50 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto px-4">
+          <div className="text-6xl mb-4">🔒</div>
+          <h2 className="text-2xl font-bold text-banana-800 mb-4">Login Required</h2>
+          <p className="text-banana-600 mb-6">
+            You need to be logged in to view your betting history.
+          </p>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => window.location.href = '/login'}
+            className="bg-banana-500 hover:bg-banana-600 text-white font-bold py-3 px-6 rounded-lg transition-colors flex items-center space-x-2 mx-auto"
+          >
+            <span>Go to Login</span>
+            <span>🍌</span>
+          </motion.button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-banana-50 via-banana-100 to-grass-50">
@@ -276,16 +286,49 @@ export default function MyBetsPage() {
           </div>
         </motion.div>
 
+        {/* Error State */}
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-red-100 border border-red-300 text-red-800 px-4 py-3 rounded-lg mb-6"
+          >
+            <div className="flex items-center space-x-2">
+              <XCircle size={20} />
+              <span>{error}</span>
+            </div>
+            <button
+              onClick={fetchUserBets}
+              className="mt-2 text-sm underline hover:no-underline"
+            >
+              Try again
+            </button>
+          </motion.div>
+        )}
+
+        {/* Loading State */}
+        {loading && !error && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="text-center py-12"
+          >
+            <div className="text-6xl mb-4">🎪</div>
+            <p className="text-xl text-banana-800">Loading your bets...</p>
+          </motion.div>
+        )}
+
         {/* Bets List */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.4 }}
-          className="space-y-4"
-        >
+        {!loading && !error && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4 }}
+            className="space-y-4"
+          >
           <AnimatePresence>
             {filteredBets.map((userBet, index) => {
-              const StatusIcon = statusIcons[userBet.status];
+              const StatusIcon = statusIcons[userBet.status as keyof typeof statusIcons];
               return (
                 <motion.div
                   key={userBet.id}
@@ -293,16 +336,20 @@ export default function MyBetsPage() {
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 20 }}
                   transition={{ delay: index * 0.05 }}
-                  className="bg-white/90 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-banana-200 hover:shadow-xl transition-all duration-200"
+                  onClick={() => handleBetClick(userBet.bet.id)}
+                  className="bg-white/90 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-banana-200 hover:shadow-xl hover:bg-white hover:border-banana-300 cursor-pointer transition-all duration-200 group"
                 >
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                     {/* Bet Info */}
                     <div className="flex items-start space-x-4 flex-1">
                       <div className="text-3xl">{userBet.bet.emoji}</div>
                       <div className="flex-1">
-                        <h3 className="font-bold text-lg text-baseball-800 mb-1">
-                          {userBet.bet.title}
-                        </h3>
+                        <div className="flex items-center space-x-2 mb-1">
+                          <h3 className="font-bold text-lg text-baseball-800">
+                            {userBet.bet.title}
+                          </h3>
+                          <ExternalLink size={16} className="text-banana-600 group-hover:text-banana-700 transition-colors" />
+                        </div>
                         <p className="text-sm text-baseball-600 mb-2">
                           {userBet.bet.description}
                         </p>
@@ -328,10 +375,6 @@ export default function MyBetsPage() {
                         <p className="font-bold text-banana-800">{userBet.amount.toFixed(4)} ZEC</p>
                       </div>
                       <div className="text-center">
-                        <p className="text-sm text-baseball-600">Odds</p>
-                        <p className="font-bold text-grass-600">{userBet.odds}x</p>
-                      </div>
-                      <div className="text-center">
                         <p className="text-sm text-baseball-600">
                           {userBet.status === 'won' ? 'Won' : 'Potential'}
                         </p>
@@ -339,13 +382,16 @@ export default function MyBetsPage() {
                           'font-bold',
                           userBet.status === 'won' ? 'text-grass-600' : 'text-banana-800'
                         )}>
-                          {userBet.potentialPayout.toFixed(4)} ZEC
+                          {userBet.potentialPayout > 0 
+                            ? `${userBet.potentialPayout.toFixed(4)} ZEC`
+                            : 'Calculating...'
+                          }
                         </p>
                       </div>
                       <div className="flex items-center space-x-2">
                         <div className={cn(
                           'flex items-center space-x-2 px-3 py-2 rounded-lg border text-sm font-medium',
-                          statusColors[userBet.status]
+                          statusColors[userBet.status as keyof typeof statusColors]
                         )}>
                           <StatusIcon size={16} />
                           <span className="capitalize">{userBet.status}</span>
@@ -357,10 +403,9 @@ export default function MyBetsPage() {
               );
             })}
           </AnimatePresence>
-        </motion.div>
 
-        {/* Empty State */}
-        {filteredBets.length === 0 && (
+          {/* Empty State */}
+          {filteredBets.length === 0 && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -388,6 +433,8 @@ export default function MyBetsPage() {
               </motion.button>
             )}
           </motion.div>
+          )}
+        </motion.div>
         )}
 
         {/* Fun Footer */}

@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from typing import Annotated, Optional
 
-from . import auth, crud, models, schemas, cleaners
+from . import auth, crud, models, schemas, cleaners, serializers, betting_utils
 from .database import SessionLocal, engine
 
 from datetime import datetime, timedelta, timezone
@@ -189,3 +189,179 @@ def get_betting_event(event_id: int, db: Session = Depends(get_db)):
     # Convert to response format using model's to_dict method
     event_data = event.to_dict(db)
     return schemas.SportEventResponse(**event_data)
+
+
+@app.post("/api/events", response_model=schemas.SportEventResponse)
+def create_betting_event(
+    event_request: schemas.CreateEventRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Create a new betting event"""
+    try:
+        # Validate the event data
+        event_data = event_request.event_data
+        
+        # Basic validation
+        if not event_data.title.strip():
+            raise HTTPException(status_code=400, detail="Event title is required")
+        if not event_data.description.strip():
+            raise HTTPException(status_code=400, detail="Event description is required")
+        
+        # Validate datetime strings and ensure they're in the future
+        try:
+            event_start_time = datetime.fromisoformat(event_data.event_start_time.replace('Z', '+00:00')).replace(tzinfo=None)
+            settlement_deadline = datetime.fromisoformat(event_data.settlement_deadline.replace('Z', '+00:00')).replace(tzinfo=None)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid datetime format")
+        
+        now = datetime.utcnow()
+        if event_start_time <= now:
+            raise HTTPException(status_code=400, detail="Event start time must be in the future")
+        if settlement_deadline <= event_start_time:
+            raise HTTPException(status_code=400, detail="Settlement deadline must be after event start time")
+        
+        # Validate category
+        try:
+            models.EventCategory(event_data.category)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid category: {event_data.category}")
+        
+        # Validate betting system type
+        try:
+            models.BettingSystemType(event_data.betting_system_type)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid betting system type: {event_data.betting_system_type}")
+        
+        # Create the sport event
+        sport_event = crud.create_sport_event(db, event_data)
+        
+        # Handle pari-mutuel specific data
+        if event_data.betting_system_type == "pari_mutuel":
+            if not event_request.pari_mutuel_data:
+                raise HTTPException(status_code=400, detail="Pari-mutuel data is required for pari-mutuel events")
+            
+            pari_data = event_request.pari_mutuel_data
+            
+            # Validate pari-mutuel data
+            if len(pari_data.betting_pools) < 2:
+                raise HTTPException(status_code=400, detail="At least 2 betting pools are required")
+            
+            # Validate betting pools
+            outcome_names = []
+            for pool in pari_data.betting_pools:
+                if not pool.outcome_name.strip():
+                    raise HTTPException(status_code=400, detail="Pool outcome name is required")
+                if not pool.outcome_description.strip():
+                    raise HTTPException(status_code=400, detail="Pool outcome description is required")
+                
+                outcome_name = pool.outcome_name.lower().strip()
+                if outcome_name in outcome_names:
+                    raise HTTPException(status_code=400, detail="Outcome names must be unique")
+                outcome_names.append(outcome_name)
+            
+            # Create the pari-mutuel event and pools
+            crud.create_pari_mutuel_event(db, sport_event.id, pari_data)
+        
+        # Return the created event with all data
+        event_dict = sport_event.to_dict(db)
+        return schemas.SportEventResponse(**event_dict)
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        # Log the error and return a generic error message
+        print(f"Error creating event: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create event")
+
+
+@app.get("/api/users/me/bets", response_model=list[schemas.BetResponse])
+def get_current_user_bets(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Get all bets for the current authenticated user"""
+    try:
+        bets = crud.get_user_bets(db, user_id=current_user.id, skip=skip, limit=limit)
+        
+        # Transform bets to response format
+        bet_responses = []
+        for bet in bets:
+            try:
+                bet_response = serializers.transform_bet_to_response(bet, db)
+                bet_responses.append(bet_response)
+            except Exception as e:
+                print(f"Error transforming bet {bet.id}: {str(e)}")
+                # Skip this bet and continue with others
+                continue
+        
+        return bet_responses
+        
+    except Exception as e:
+        print(f"Error fetching user bets: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch user bets")
+
+
+@app.post("/api/bets", response_model=schemas.BetResponse)
+def place_bet(
+    bet_request: schemas.BetPlacementRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Place a new bet for the current authenticated user"""
+    try:
+        # Get the sport event and validate
+        sport_event = crud.get_sport_event(db, bet_request.sport_event_id)
+        if not sport_event:
+            raise HTTPException(status_code=404, detail="Sport event not found")
+        
+        # Validate the bet request
+        betting_utils.validate_bet_for_event(sport_event, bet_request.predicted_outcome, bet_request.amount)
+        
+        # Create the bet record
+        bet = crud.create_bet(db, bet_request, current_user.id)
+        
+        # Process betting system-specific logic
+        betting_utils.process_bet_placement(db, bet, sport_event)
+        db.commit()  # Commit all changes
+        
+        # Transform to response format
+        bet_response = serializers.transform_bet_to_response(bet, db)
+        
+        return bet_response
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        print(f"Error placing bet: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to place bet")
+
+
+@app.get("/api/statistics", response_model=schemas.StatisticsResponse)
+def get_statistics(db: Session = Depends(get_db)):
+    """Get overall platform statistics"""
+    try:
+        # Count total bets (only confirmed deposits)
+        total_bets = db.query(models.Bet).filter(
+            models.Bet.deposit_status == models.DepositStatus.CONFIRMED
+        ).count()
+        
+        # Count total events
+        total_events = db.query(models.SportEvent).count()
+        
+        # Count total users
+        total_users = db.query(models.User).count()
+        
+        return schemas.StatisticsResponse(
+            total_bets=total_bets,
+            total_events=total_events,
+            total_users=total_users
+        )
+        
+    except Exception as e:
+        print(f"Error fetching statistics: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch statistics")

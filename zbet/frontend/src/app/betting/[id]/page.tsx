@@ -5,6 +5,8 @@ import { useParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Clock, TrendingUp, DollarSign, Users } from 'lucide-react';
 import { cn, getRandomBananaEmoji } from '@/lib/utils';
+import { bettingApi } from '@/lib/api';
+import { useAuth } from '@/hooks/useAuth';
 import Disclaimer from '@/components/Disclaimer';
 
 // API Configuration
@@ -66,12 +68,13 @@ function adaptPariMutuelData(systemData: any): BettingDisplayData {
         value: `${systemData?.minimum_bet || 0.001} - ${systemData?.maximum_bet || 1.0} ZEC`
       }
     ],
-    additionalInfo: poolData.map(pool => ({
+    additionalInfo: poolData.map((pool: any) => ({
       label: pool.description,
       value: `${pool.percentage}%`,
-      subtext: `${pool.amount.toFixed(4)} ZEC (${pool.betCount} bets)${pool.estimatedPayout > 0 ? ` • Est. ${pool.estimatedPayout.toFixed(2)}:1` : ''}`,
+      subtext: `${pool.amount.toFixed(4)} ZEC (${pool.betCount} bets)`,
       poolId: pool.id,
-      poolName: pool.name
+      poolName: pool.name,
+      outcomeId: pool.name  // Add the actual outcome name for betting
     })),
     fees: `House ${(houseFee * 100).toFixed(1)}% + Oracle ${(oracleFee * 100).toFixed(1)}%`
   };
@@ -183,6 +186,7 @@ function getBettingDisplayData(bettingSystemType: string, systemData: any): Bett
 export default function IndividualBettingPage() {
   const params = useParams();
   const router = useRouter();
+  const { user, isAuthenticated } = useAuth();
   const betId = params.id as string;
   
   const [bet, setBet] = useState<any>(null);
@@ -191,6 +195,7 @@ export default function IndividualBettingPage() {
   const [selectedOutcome, setSelectedOutcome] = useState<string | null>(null);
   const [betAmount, setBetAmount] = useState<string>('');
   const [isPlacing, setIsPlacing] = useState(false);
+  const [placementError, setPlacementError] = useState<string | null>(null);
   const [emoji] = useState(getRandomBananaEmoji());
 
   useEffect(() => {
@@ -247,16 +252,41 @@ export default function IndividualBettingPage() {
   };
 
   const handlePlaceBet = async () => {
-    if (!selectedOutcome || !betAmount || !bet) return;
+    if (!selectedOutcome || !betAmount || !bet || !isAuthenticated) return;
     
     setIsPlacing(true);
-    // TODO: Implement actual bet placement API call
-    setTimeout(() => {
-      const selectedOption = bet.bettingDisplay.additionalInfo?.find((info: any) => info.label === selectedOutcome);
-      alert(`Bet placed: ${betAmount} ZEC on "${selectedOption?.label || selectedOutcome}" ${emoji}`);
+    setPlacementError(null);
+    
+    try {
+      const amount = parseFloat(betAmount);
+      if (isNaN(amount) || amount <= 0) {
+        throw new Error('Please enter a valid bet amount');
+      }
+      
+      const betData = {
+        sport_event_id: parseInt(betId),
+        predicted_outcome: selectedOutcome,
+        amount: amount
+      };
+      
+      const placedBet = await bettingApi.placeBet(betData);
+      
+      // Success! Show confirmation
+      alert(`Bet placed successfully! ${amount} ZEC on "${selectedOutcome}" ${emoji}`);
+      
+      // Clear the form
+      setSelectedOutcome(null);
+      setBetAmount('');
+      
+      // Refresh the event data to show updated statistics
+      await fetchBetDetails();
+      
+    } catch (err: any) {
+      console.error('Failed to place bet:', err);
+      setPlacementError(err.response?.data?.detail || err.message || 'Failed to place bet');
+    } finally {
       setIsPlacing(false);
-      // Could redirect to my-bets page or show success state
-    }, 1000);
+    }
   };
 
   // Loading state
@@ -391,12 +421,12 @@ export default function IndividualBettingPage() {
                 {bet.bettingDisplay.additionalInfo?.map((outcome: any, index: number) => (
                   <motion.button
                     key={index}
-                    onClick={() => setSelectedOutcome(outcome.label)}
+                    onClick={() => setSelectedOutcome(outcome.outcomeId || outcome.label)}
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     className={cn(
                       'w-full p-4 border rounded-lg text-left transition-all',
-                      selectedOutcome === outcome.label
+                      selectedOutcome === (outcome.outcomeId || outcome.label)
                         ? 'border-banana-500 bg-banana-50 ring-2 ring-banana-200'
                         : 'border-banana-200 hover:border-banana-300 hover:bg-banana-25'
                     )}
@@ -440,27 +470,46 @@ export default function IndividualBettingPage() {
                   </div>
                 </div>
 
+                {/* Error Display */}
+                {placementError && (
+                  <div className="bg-red-100 border border-red-300 text-red-800 px-4 py-3 rounded-lg">
+                    <p className="text-sm">{placementError}</p>
+                  </div>
+                )}
+
                 {/* Place Bet Button */}
-                <motion.button
-                  onClick={handlePlaceBet}
-                  disabled={!selectedOutcome || !betAmount || isPlacing}
-                  whileHover={{ scale: !selectedOutcome || !betAmount ? 1 : 1.02 }}
-                  whileTap={{ scale: !selectedOutcome || !betAmount ? 1 : 0.98 }}
-                  className="w-full bg-banana-500 text-white font-bold py-4 px-6 rounded-lg hover:bg-banana-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center space-x-3 text-lg"
-                >
-                  {isPlacing ? (
-                    <>
-                      <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full"></div>
-                      <span>Placing Bet...</span>
-                    </>
-                  ) : (
-                    <>
-                      <DollarSign size={20} />
-                      <span>Place Bet</span>
-                      <span className="text-xl">{emoji}</span>
-                    </>
-                  )}
-                </motion.button>
+                {!isAuthenticated ? (
+                  <motion.button
+                    onClick={() => router.push('/login')}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="w-full bg-gray-500 text-white font-bold py-4 px-6 rounded-lg hover:bg-gray-600 transition-colors flex items-center justify-center space-x-3 text-lg"
+                  >
+                    <span>Login to Place Bet</span>
+                    <span className="text-xl">🔒</span>
+                  </motion.button>
+                ) : (
+                  <motion.button
+                    onClick={handlePlaceBet}
+                    disabled={!selectedOutcome || !betAmount || isPlacing}
+                    whileHover={{ scale: !selectedOutcome || !betAmount ? 1 : 1.02 }}
+                    whileTap={{ scale: !selectedOutcome || !betAmount ? 1 : 0.98 }}
+                    className="w-full bg-banana-500 text-white font-bold py-4 px-6 rounded-lg hover:bg-banana-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center space-x-3 text-lg"
+                  >
+                    {isPlacing ? (
+                      <>
+                        <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full"></div>
+                        <span>Placing Bet...</span>
+                      </>
+                    ) : (
+                      <>
+                        <DollarSign size={20} />
+                        <span>Place Bet</span>
+                        <span className="text-xl">{emoji}</span>
+                      </>
+                    )}
+                  </motion.button>
+                )}
               </div>
             </div>
           </motion.div>

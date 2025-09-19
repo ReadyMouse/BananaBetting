@@ -32,13 +32,19 @@ const navigationItems = [
     emoji: '🔍'
   },
   {
+    name: 'Make Event',
+    href: '/make-event',
+    icon: Trophy,
+    emoji: '🎪'
+  },
+  {
     name: 'My Bets',
     href: '/my-bets',
     icon: TrendingUp,
     emoji: '📈'
   },
   {
-    name: 'Profile',
+    name: 'Profile', // This will be dynamically replaced with username
     href: '/profile',
     icon: User,
     emoji: '👤'
@@ -124,6 +130,7 @@ export default function Navigation() {
                   <nav className="space-y-2">
                     {navigationItems.map((item) => {
                       const isActive = pathname === item.href;
+                      const displayName = item.name === 'Profile' ? (user?.username || 'Profile') : item.name;
                       return (
                         <Link
                           key={item.name}
@@ -137,7 +144,7 @@ export default function Navigation() {
                           )}
                         >
                           <span className="text-xl">{item.emoji}</span>
-                          <span className="font-medium">{item.name}</span>
+                          <span className="font-medium">{displayName}</span>
                         </Link>
                       );
                     })}
@@ -185,6 +192,7 @@ export default function Navigation() {
               <nav className="flex items-center space-x-6">
                 {navigationItems.map((item) => {
                   const isActive = pathname === item.href;
+                  const displayName = item.name === 'Profile' ? (user?.username || 'Profile') : item.name;
                   return (
                     <Link
                       key={item.name}
@@ -199,7 +207,7 @@ export default function Navigation() {
                       <span className="text-lg group-hover:scale-110 transition-transform">
                         {item.emoji}
                       </span>
-                      <span className="font-medium">{item.name}</span>
+                      <span className="font-medium">{displayName}</span>
                     </Link>
                   );
                 })}
@@ -212,13 +220,6 @@ export default function Navigation() {
                   <span className="font-medium text-baseball-800">
                     {user?.balance ? `${parseFloat(user.balance).toFixed(4)} ZEC` : '0.0000 ZEC'}
                   </span>
-                </div>
-                
-                <div className="flex items-center space-x-3 px-4 py-2 bg-banana-300 rounded-lg">
-                  <div className="w-8 h-8 bg-banana-600 rounded-full flex items-center justify-center">
-                    <span className="text-sm">{userEmoji}</span>
-                  </div>
-                  <span className="font-medium text-baseball-800">{user?.username}</span>
                 </div>
 
                 <button

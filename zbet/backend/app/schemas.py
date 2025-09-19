@@ -78,3 +78,65 @@ class SportEventResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# Schemas for creating events
+class SportEventCreate(BaseModel):
+    title: str
+    description: str
+    category: str
+    betting_system_type: str
+    event_start_time: str
+    settlement_deadline: str
+
+
+class PariMutuelPoolCreate(BaseModel):
+    outcome_name: str
+    outcome_description: str
+
+
+class PariMutuelEventCreate(BaseModel):
+    betting_pools: list[PariMutuelPoolCreate]
+
+
+class CreateEventRequest(BaseModel):
+    event_data: SportEventCreate
+    pari_mutuel_data: PariMutuelEventCreate | None = None
+
+
+# Bet schemas for responses
+class BetResponse(BaseModel):
+    id: int
+    betId: str  # Use betId to match frontend interface
+    amount: float
+    predicted_outcome: str
+    outcome: str | None = None
+    status: str  # Computed from deposit_status and outcome
+    placedAt: str  # bet_placed_at formatted
+    settledAt: str | None = None
+    potentialPayout: float | None = None  # Will be calculated based on betting system
+    bet: SportEventResponse  # The event this bet is on
+
+    class Config:
+        from_attributes = True
+
+
+class UserBetListResponse(BaseModel):
+    bets: list[BetResponse]
+
+
+# Bet placement request schema
+class BetPlacementRequest(BaseModel):
+    sport_event_id: int
+    predicted_outcome: str
+    amount: float
+    
+    class Config:
+        from_attributes = True
+
+
+# Statistics response schema
+class StatisticsResponse(BaseModel):
+    total_bets: int
+    total_events: int
+    total_users: int

@@ -69,7 +69,8 @@ function adaptPariMutuelData(systemData: BettingSystemData): BettingDisplayData 
     additionalInfo: poolData.slice(0, 2).map(pool => ({
       label: pool.description,
       value: `${pool.percentage}%`,
-      subtext: `${pool.amount.toFixed(4)} ZEC (${pool.betCount} bets)${pool.estimatedPayout > 0 ? ` • Est. ${pool.estimatedPayout.toFixed(2)}:1` : ''}`
+      subtext: `${pool.amount.toFixed(4)} ZEC (${pool.betCount} bets)${pool.estimatedPayout > 0 ? ` • Est. ${pool.estimatedPayout.toFixed(2)}:1` : ''}`,
+      outcomeId: pool.name  // Add the actual outcome name for betting
     })),
     fees: `House ${(houseFee * 100).toFixed(1)}% + Oracle ${(oracleFee * 100).toFixed(1)}%`
   };

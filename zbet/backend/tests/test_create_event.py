@@ -58,13 +58,13 @@ def create_sample_event():
         # Create betting pools (the possible outcomes)
         pool_yes = PariMutuelPool(
             pari_mutuel_event_id=pari_event.id,
-            outcome_name="bananas_thrown",
+            outcome_name="outcome_occurs",
             outcome_description="Yes, bananas will be thrown onto the field"
         )
         
         pool_no = PariMutuelPool(
             pari_mutuel_event_id=pari_event.id,
-            outcome_name="no_bananas",
+            outcome_name="outcome_not_occurs",
             outcome_description="No bananas will be thrown onto the field"
         )
         

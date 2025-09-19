@@ -3,10 +3,11 @@
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { motion } from 'framer-motion';
-import { TrendingUp, Search, Users, Trophy, Zap, Star } from 'lucide-react';
+import { TrendingUp, Search, Users, Trophy, Zap, Star, Calendar } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { getRandomBananaEmoji } from '@/lib/utils';
 import Disclaimer from '@/components/Disclaimer';
+import { bettingApi, Statistics } from '@/lib/api';
 
 // API Configuration
 const API_BASE_URL = 'http://localhost:8000';
@@ -79,6 +80,8 @@ export default function Home() {
   const [buttonEmojis, setButtonEmojis] = useState(['🍌', '🍌']);
   const [featuredBets, setFeaturedBets] = useState<any[]>([]);
   const [betsLoading, setBetsLoading] = useState(true);
+  const [statistics, setStatistics] = useState<Statistics | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
 
   useEffect(() => {
     setMounted(true);
@@ -91,8 +94,9 @@ export default function Home() {
     if (mounted) {
       // Set random emojis after mounting
       setButtonEmojis([getRandomBananaEmoji(), getRandomBananaEmoji()]);
-      // Fetch featured bets
+      // Fetch featured bets and statistics
       fetchFeaturedBets();
+      fetchStatistics();
     }
   }, [mounted]);
 
@@ -128,6 +132,19 @@ export default function Home() {
       setFeaturedBets([]);
     } finally {
       setBetsLoading(false);
+    }
+  };
+
+  const fetchStatistics = async () => {
+    try {
+      setStatsLoading(true);
+      const stats = await bettingApi.getStatistics();
+      setStatistics(stats);
+    } catch (error) {
+      console.error('Failed to fetch statistics:', error);
+      // Keep null state so we can show fallback
+    } finally {
+      setStatsLoading(false);
     }
   };
 
@@ -167,10 +184,26 @@ export default function Home() {
   }
 
 
-  const stats = [
-    { label: "Active Bets", value: "47", icon: TrendingUp },
-    { label: "Players Online", value: "1,234", icon: Users },
+  const stats = statsLoading ? [
+    { label: "Total Bets", value: "...", icon: TrendingUp },
+    { label: "Betting Events", value: "...", icon: Calendar },
     { label: "Fun Level", value: "MAX", icon: Zap },
+  ] : [
+    { 
+      label: "Total Bets", 
+      value: statistics?.total_bets?.toString() || "0", 
+      icon: TrendingUp 
+    },
+    { 
+      label: "Betting Events", 
+      value: statistics?.total_events?.toString() || "0", 
+      icon: Calendar 
+    },
+    { 
+      label: "Fun Level", 
+      value: "MAX", 
+      icon: Zap 
+    },
   ];
 
   return (
