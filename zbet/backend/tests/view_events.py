@@ -42,7 +42,7 @@ def view_all_events():
                     print(f"      Min Bet: {pari_event.minimum_bet} ZEC")
                     print(f"      Max Bet: {pari_event.maximum_bet} ZEC")
                     print(f"      House Fee: {pari_event.house_fee_percentage * 100}%")
-                    print(f"      Oracle Fee: {pari_event.oracle_fee_percentage * 100}%")
+                    print(f"      Creator Fee: {pari_event.creator_fee_percentage * 100}%")
                     print(f"      Total Pool: {pari_event.total_pool} ZEC")
                     
                     # Show betting pools

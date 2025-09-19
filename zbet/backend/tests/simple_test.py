@@ -32,7 +32,7 @@ def test_to_dict():
                 print(f"      Min Bet: {system_data['minimum_bet']} ZEC")
                 print(f"      Max Bet: {system_data['maximum_bet']} ZEC")
                 print(f"      House Fee: {system_data['house_fee_percentage'] * 100}%")
-                print(f"      Oracle Fee: {system_data['oracle_fee_percentage'] * 100}%")
+                print(f"      Creator Fee: {system_data['creator_fee_percentage'] * 100}%")
                 print(f"      Pools: {len(system_data['betting_pools'])}")
                 
                 for pool in system_data['betting_pools']:

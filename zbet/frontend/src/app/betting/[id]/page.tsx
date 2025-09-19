@@ -37,8 +37,8 @@ function adaptPariMutuelData(systemData: any): BettingDisplayData {
   const totalPool = systemData?.total_pool || 0;
   const pools = systemData?.betting_pools || [];
   const houseFee = systemData?.house_fee_percentage || 0.05;
-  const oracleFee = systemData?.oracle_fee_percentage || 0.02;
-  const netPool = totalPool * (1 - houseFee - oracleFee);
+  const creatorFee = systemData?.creator_fee_percentage || 0.02;
+  const netPool = totalPool * (1 - houseFee - creatorFee);
   
   // Calculate pool percentages and estimated payouts
   const poolData = pools.map((pool: any) => {
@@ -76,7 +76,7 @@ function adaptPariMutuelData(systemData: any): BettingDisplayData {
       poolName: pool.name,
       outcomeId: pool.name  // Add the actual outcome name for betting
     })),
-    fees: `House ${(houseFee * 100).toFixed(1)}% + Oracle ${(oracleFee * 100).toFixed(1)}%`
+    fees: `House ${(houseFee * 100).toFixed(1)}% + Creator ${(creatorFee * 100).toFixed(1)}%`
   };
 }
 

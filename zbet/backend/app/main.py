@@ -6,6 +6,7 @@ from typing import Annotated, Optional
 
 from . import auth, crud, models, schemas, cleaners, serializers, betting_utils
 from .database import SessionLocal, engine
+from .config import settings
 
 from datetime import datetime, timedelta, timezone
 from jose import JWTError, jwt
@@ -234,7 +235,7 @@ def create_betting_event(
             raise HTTPException(status_code=400, detail=f"Invalid betting system type: {event_data.betting_system_type}")
         
         # Create the sport event
-        sport_event = crud.create_sport_event(db, event_data)
+        sport_event = crud.create_sport_event(db, event_data, current_user.id)
         
         # Handle pari-mutuel specific data
         if event_data.betting_system_type == "pari_mutuel":
@@ -341,6 +342,12 @@ def place_bet(
         raise HTTPException(status_code=500, detail="Failed to place bet")
 
 
+@app.get("/api/config")
+def get_configuration():
+    """Get current application configuration (non-sensitive data only)."""
+    return settings.get_config_summary()
+
+
 @app.get("/api/statistics", response_model=schemas.StatisticsResponse)
 def get_statistics(db: Session = Depends(get_db)):
     """Get overall platform statistics"""
@@ -365,3 +372,120 @@ def get_statistics(db: Session = Depends(get_db)):
     except Exception as e:
         print(f"Error fetching statistics: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to fetch statistics")
+
+
+@app.post("/api/events/{event_id}/settle", response_model=schemas.SettlementResponse)
+def settle_betting_event(
+    event_id: int,
+    settlement_request: schemas.SettlementRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """
+    Settle a betting event with the final outcome and process all payouts.
+    
+    This endpoint:
+    1. Validates the winning outcome
+    2. Calculates payouts for all winning bets
+    3. Creates payout records in the database
+    4. Sends a batch Zcash transaction to all winners
+    5. Marks the event as settled
+    
+    Args:
+        event_id: ID of the event to settle
+        settlement_request: Contains the winning outcome
+        
+    Returns:
+        SettlementResponse with settlement details and payout information
+    """
+    try:
+        # TODO: Add authorization check - only event creators or admins should be able to settle events
+        # For now, any authenticated user can settle events (this should be restricted in production)
+        
+        # Process the settlement using configured addresses
+        settlement_response = betting_utils.settle_event(
+            db=db,
+            event_id=event_id,
+            winning_outcome=settlement_request.winning_outcome
+        )
+        
+        return settlement_response
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions from betting_utils
+        raise
+    except Exception as e:
+        print(f"Error settling event {event_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to settle event")
+
+
+@app.get("/api/events/{event_id}/settlement", response_model=schemas.SettlementResponse | None)
+def get_event_settlement(
+    event_id: int,
+    db: Session = Depends(get_db)
+):
+    """Get settlement information for an event if it has been settled"""
+    try:
+        # Get the event
+        sport_event = db.query(models.SportEvent).filter(models.SportEvent.id == event_id).first()
+        if not sport_event:
+            raise HTTPException(status_code=404, detail="Event not found")
+        
+        # Return None if not settled
+        if sport_event.status != models.EventStatus.SETTLED or not sport_event.settled_at:
+            return None
+        
+        # Get payout records for this event
+        payouts = db.query(models.Payout).filter(models.Payout.sport_event_id == event_id).all()
+        
+        # Build payout records for response
+        payout_records = []
+        for payout in payouts:
+            payout_records.append(schemas.PayoutRecord(
+                user_id=payout.user_id,
+                bet_id=payout.bet_id,
+                payout_amount=payout.payout_amount,
+                house_fee_deducted=payout.house_fee_deducted,
+                creator_fee_deducted=payout.creator_fee_deducted,
+                user_address=payout.user.zcash_address
+            ))
+        
+        # Get winning outcome
+        winning_outcome = None
+        if sport_event.betting_system_type == models.BettingSystemType.PARI_MUTUEL:
+            pari_event = db.query(models.PariMutuelEvent).filter(
+                models.PariMutuelEvent.sport_event_id == event_id
+            ).first()
+            if pari_event:
+                winning_outcome = pari_event.winning_outcome
+        
+        if not winning_outcome:
+            # Fall back to first winning bet's outcome
+            winning_bet = db.query(models.Bet).filter(
+                models.Bet.sport_event_id == event_id,
+                models.Bet.outcome == models.BetOutcome.WIN
+            ).first()
+            if winning_bet:
+                winning_outcome = winning_bet.predicted_outcome
+        
+        # Calculate totals
+        total_payout_amount = sum(payout.payout_amount for payout in payouts)
+        
+        # Get transaction ID from first payout record
+        transaction_id = payouts[0].zcash_transaction_id if payouts else None
+        
+        return schemas.SettlementResponse(
+            event_id=event_id,
+            winning_outcome=winning_outcome or "unknown",
+            total_payouts=len(payouts),
+            total_payout_amount=total_payout_amount,
+            transaction_id=transaction_id,
+            settled_at=sport_event.settled_at.isoformat() + 'Z',
+            payout_records=payout_records
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error fetching settlement for event {event_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch settlement information")

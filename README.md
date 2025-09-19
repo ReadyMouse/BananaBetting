@@ -33,8 +33,8 @@ ZCASH_RPC_URL = "http://127.0.0.1:8232/"
 ### 1. Clone the Repository
 
 ```bash
-git clone <repository-url>
-cd zSiren
+git clone git@github.com:ReadyMouse/BananaBetting.git
+cd BananaBetting
 ```
 
 ### 2. Launch the API
@@ -44,12 +44,6 @@ cd zSiren
 ```
 
 The API will be available at: **http://localhost:3000**
-
-## 📚 API Documentation
-
-Once running, access the interactive API documentation:
-- **Swagger UI**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
 
 ## 🔑 API Endpoints
 
@@ -70,45 +64,9 @@ Once running, access the interactive API documentation:
 - `GET /health/` - Health check endpoint
 - `GET /` - API information
 
-## 💡 Usage Examples
-
-### Register a New User
-```bash
-curl -X POST "http://localhost:8000/register/" \
-     -H "Content-Type: application/json" \
-     -d '{
-       "email": "user@example.com",
-       "username": "username",
-       "password": "secure_password"
-     }'
-```
-
-### Login
-```bash
-curl -X POST "http://localhost:8000/login/" \
-     -H "Content-Type: application/x-www-form-urlencoded" \
-     -d "username=username&password=secure_password"
-```
-
-### Send Zcash Transaction
-```bash
-curl -X POST "http://localhost:8000/zcash/send/" \
-     -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
-     -H "Content-Type: application/json" \
-     -d '{
-       "address": "zcash_destination_address",
-       "amount": 0.01
-     }'
-```
-
-### Check Balance
-```bash
-curl -X GET "http://localhost:8000/zcash/balance/" \
-     -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
-```
 
 ## 🗂️ Project Structure
-
+TODO: Update for front-end
 ```
 zcash-transaction-api/
 ├── zbet/backend/
@@ -129,51 +87,10 @@ zcash-transaction-api/
 └── README.md                   # This file
 ```
 
-## 🔧 Development
-
-### Manual Setup
-
-```bash
-cd zbet/backend
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main_transactions:app --reload --host 127.0.0.1 --port 8000
-```
-
-### Environment Variables
-
-You can set these environment variables to customize the setup:
-- `ZCASH_RPC_URL`: Zcash node RPC URL
-- `ZCASH_RPC_USER`: RPC username  
-- `ZCASH_RPC_PASSWORD`: RPC password
-- `ZCASH_USE_TESTNET`: Set to "true" for testnet, "false" for mainnet (default: "true")
-
-### Testnet Configuration
-
-To use Zcash testnet (recommended for development):
-
-```bash
-export ZCASH_USE_TESTNET=true
-./launch_backend.sh
-```
-
-This will configure the system to:
-- Attempt to connect to a local testnet node at `http://127.0.0.1:18232/`
-- Generate realistic testnet-style mock addresses when no node is available
-- Use testnet format for all addresses (safe for development)
-
-**For Real Testnet Connection:**
-To connect to an actual Zcash testnet node, you can:
-1. Set up a local testnet node
-2. Use a custom RPC URL: `export ZCASH_RPC_URL="your_testnet_rpc_url"`
-
-**Note**: The system defaults to testnet mode for safe development. To use mainnet, set `ZCASH_USE_TESTNET=false`.
-
 ## 🛡️ Security Notes
 
 - Change the JWT secret key in production (`auth.py`)
-- Use environment variables for sensitive configuration
+- Use zbet/backend/.env environment variables for sensitive configuration
 - Ensure Zcash node RPC is properly secured
 - Use HTTPS in production environments
 - Regularly update dependencies
@@ -182,6 +99,16 @@ To connect to an actual Zcash testnet node, you can:
 
 This project is a proof-of-concept for development purposes.
 
----
+**⚠️ IMPORTANT DISCLAIMER ⚠️**
 
-**Note**: This API requires a running Zcash node with RPC enabled. Ensure your node is properly configured and synchronized before using the transaction features.
+This project was created for the **2025 ZecHub Hackathon** (https://hackathon.zechub.wiki/) and is intended **ONLY** for educational purposes, blockchain functionality testing, and hackathon demonstration.
+
+**🚨 DO NOT USE IN PRODUCTION 🚨**
+
+- This application could potentially constitute an illegal betting/gambling site in many jurisdictions
+- Gambling laws vary significantly by location and this software does not comply with any regulatory requirements
+- This is a proof-of-concept built for fun and to explore Zcash blockchain functionality
+- The developers assume no responsibility for any legal issues arising from the use of this software
+- Users are solely responsible for ensuring compliance with their local laws and regulations
+
+**Technical Note**: This API requires a running Zcash node with RPC enabled. Ensure your node is properly configured and synchronized before using the transaction features.

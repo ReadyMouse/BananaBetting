@@ -35,8 +35,8 @@ function adaptPariMutuelData(systemData: BettingSystemData): BettingDisplayData 
   const totalPool = systemData?.total_pool || 0;
   const pools = systemData?.betting_pools || [];
   const houseFee = systemData?.house_fee_percentage || 0.05;
-  const oracleFee = systemData?.oracle_fee_percentage || 0.02;
-  const netPool = totalPool * (1 - houseFee - oracleFee);
+  const creatorFee = systemData?.creator_fee_percentage || 0.02;
+  const netPool = totalPool * (1 - houseFee - creatorFee);
   
   // Calculate pool percentages and estimated payouts
   const poolData = pools.map(pool => {
@@ -72,7 +72,7 @@ function adaptPariMutuelData(systemData: BettingSystemData): BettingDisplayData 
       subtext: `${pool.amount.toFixed(4)} ZEC (${pool.betCount} bets)${pool.estimatedPayout > 0 ? ` • Est. ${pool.estimatedPayout.toFixed(2)}:1` : ''}`,
       outcomeId: pool.name  // Add the actual outcome name for betting
     })),
-    fees: `House ${(houseFee * 100).toFixed(1)}% + Oracle ${(oracleFee * 100).toFixed(1)}%`
+    fees: `House ${(houseFee * 100).toFixed(1)}% + Creator ${(creatorFee * 100).toFixed(1)}%`
   };
 }
 
@@ -187,7 +187,7 @@ interface BettingSystemData {
   minimum_bet: number;
   maximum_bet: number;
   house_fee_percentage: number;
-  oracle_fee_percentage: number;
+  creator_fee_percentage: number;
   total_pool: number;
   winning_outcome?: string;
   betting_pools: BettingPool[];

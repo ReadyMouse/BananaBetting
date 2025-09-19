@@ -69,7 +69,7 @@ def get_sport_event(db: Session, event_id: int):
     return db.query(models.SportEvent).filter(models.SportEvent.id == event_id).first()
 
 
-def create_sport_event(db: Session, event_data: schemas.SportEventCreate):
+def create_sport_event(db: Session, event_data: schemas.SportEventCreate, creator_id: int):
     """Create a new sport event"""
     # Convert string datetime to timezone-naive datetime objects
     event_start_time = datetime.fromisoformat(event_data.event_start_time.replace('Z', '+00:00')).replace(tzinfo=None)
@@ -80,6 +80,7 @@ def create_sport_event(db: Session, event_data: schemas.SportEventCreate):
         description=event_data.description,
         category=models.EventCategory(event_data.category),
         betting_system_type=models.BettingSystemType(event_data.betting_system_type),
+        creator_id=creator_id,
         event_start_time=event_start_time,
         settlement_deadline=settlement_deadline,
         status=models.EventStatus.OPEN
@@ -99,7 +100,7 @@ def create_pari_mutuel_event(db: Session, sport_event_id: int, pari_mutuel_data:
         minimum_bet=0.001,  # Default minimum bet
         maximum_bet=1.0,    # Default maximum bet
         house_fee_percentage=0.05,  # Default 5% house fee
-        oracle_fee_percentage=0.02  # Default 2% oracle fee
+        creator_fee_percentage=0.02  # Default 2% creator fee
     )
     
     db.add(db_pari_event)

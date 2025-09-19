@@ -54,7 +54,7 @@ class PariMutuelEventResponse(BaseModel):
     minimum_bet: float
     maximum_bet: float
     house_fee_percentage: float
-    oracle_fee_percentage: float
+    creator_fee_percentage: float
     total_pool: float
     winning_outcome: str | None = None
     betting_pools: list[PariMutuelPoolResponse] = []
@@ -140,3 +140,37 @@ class StatisticsResponse(BaseModel):
     total_bets: int
     total_events: int
     total_users: int
+
+
+# Settlement schemas
+class SettlementRequest(BaseModel):
+    winning_outcome: str
+    
+    class Config:
+        from_attributes = True
+
+
+class PayoutRecord(BaseModel):
+    user_id: int | None = None  # Null for house/creator fees
+    bet_id: int | None = None   # Null for house/creator fees
+    payout_amount: float
+    payout_type: str = "user_winning"  # "user_winning", "house_fee", "creator_fee"
+    recipient_address: str
+    house_fee_deducted: float = 0.0
+    creator_fee_deducted: float = 0.0
+    
+    class Config:
+        from_attributes = True
+
+
+class SettlementResponse(BaseModel):
+    event_id: int
+    winning_outcome: str
+    total_payouts: int
+    total_payout_amount: float
+    transaction_id: str | None = None
+    settled_at: str
+    payout_records: list[PayoutRecord]
+    
+    class Config:
+        from_attributes = True

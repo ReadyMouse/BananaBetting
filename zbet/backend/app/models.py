@@ -70,12 +70,16 @@ class SportEvent(Base):
     category = Column(Enum(EventCategory), nullable=False)
     status = Column(Enum(EventStatus), default=EventStatus.OPEN, nullable=False)
     betting_system_type = Column(Enum(BettingSystemType), nullable=False)
+    creator_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     
     # Event timing
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     event_start_time = Column(DateTime, nullable=False)
     settlement_deadline = Column(DateTime, nullable=False)
     settled_at = Column(DateTime, nullable=True)
+    
+    # Relationships
+    creator = relationship("User")
     
     # Serialization methods
     def to_dict(self, db_session):
@@ -117,7 +121,7 @@ class PariMutuelEvent(Base):
     minimum_bet = Column(Float, nullable=False, default=0.001)
     maximum_bet = Column(Float, nullable=False, default=1.0)
     house_fee_percentage = Column(Float, default=0.05, nullable=False)  # 5% default house fee
-    oracle_fee_percentage = Column(Float, default=0.02, nullable=False)  # 2% default oracle fee
+    creator_fee_percentage = Column(Float, default=0.02, nullable=False)  # 2% default creator fee
     
     # Relationships
     betting_pools = relationship("PariMutuelPool", back_populates="pari_mutuel_event")
@@ -139,7 +143,7 @@ class PariMutuelEvent(Base):
             "minimum_bet": self.minimum_bet,
             "maximum_bet": self.maximum_bet,
             "house_fee_percentage": self.house_fee_percentage,
-            "oracle_fee_percentage": self.oracle_fee_percentage,
+            "creator_fee_percentage": self.creator_fee_percentage,
             "total_pool": self.total_pool,
             "winning_outcome": self.winning_outcome,
             "betting_pools": [pool.to_dict() for pool in pools]
@@ -209,7 +213,7 @@ class Bet(Base):
     # Payout details (calculated when event settles)
     payout_amount = Column(Float, nullable=True)  # Final payout amount after settlement
     house_fee_deducted = Column(Float, nullable=True)  # House fee deducted from this bet
-    oracle_fee_deducted = Column(Float, nullable=True)  # Oracle fee deducted from this bet
+    creator_fee_deducted = Column(Float, nullable=True)  # Creator fee deducted from this bet
     
     # Relationships
     user = relationship("User", back_populates="bets")
@@ -255,14 +259,18 @@ class Payout(Base):
     id = Column(Integer, primary_key=True)
     
     # Foreign keys
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    bet_id = Column(Integer, ForeignKey("bets.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # Nullable for house/creator fees
+    bet_id = Column(Integer, ForeignKey("bets.id"), nullable=True)    # Nullable for house/creator fees
     sport_event_id = Column(Integer, ForeignKey("sport_events.id"), nullable=False)
+    
+    # Payout type to distinguish between user winnings and fee collections
+    payout_type = Column(String(20), nullable=False, default="user_winning")  # "user_winning", "house_fee", "creator_fee"
     
     # Payout details
     payout_amount = Column(Float, nullable=False)  # Amount in ZEC
-    house_fee_deducted = Column(Float, nullable=False)  # House fee amount deducted
-    oracle_fee_deducted = Column(Float, nullable=False, default=0.0)  # Oracle/settlement fee deducted
+    recipient_address = Column(String(100), nullable=False)  # Zcash address to send funds to
+    house_fee_deducted = Column(Float, nullable=False, default=0.0)  # House fee amount deducted (only for user winnings)
+    creator_fee_deducted = Column(Float, nullable=False, default=0.0)  # Creator fee amount deducted (only for user winnings)
     
     # Transaction details
     zcash_transaction_id = Column(String(100), nullable=True)  # Payout transaction hash

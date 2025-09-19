@@ -44,26 +44,33 @@ def _calculate_pari_mutuel_payout(bet: models.Bet, sport_event: models.SportEven
     if not pool or pool.pool_amount <= 0:
         return bet.amount
     
-    # Calculate net pool after fees
+    # Calculate fees
     house_fee = pari_event.house_fee_percentage
-    oracle_fee = pari_event.oracle_fee_percentage
-    net_pool = pari_event.total_pool * (1 - house_fee - oracle_fee)
+    creator_fee = pari_event.creator_fee_percentage
+    total_fee_percentage = house_fee + creator_fee
     
-    # Calculate pari-mutuel payout
-    # In pari-mutuel: User's Payout = (User's Bet / Winning Pool) × Net Prize Pool
+    # Calculate pari-mutuel payout for display using correct formula
+    # Payout = Original Bet + (User's Bet / Winning Pool) × Losing Pools - Fees
     # 
     # Example: 
     # - Total pools: $100 (Pool A: $30, Pool B: $70)
-    # - Fees: 10% 
-    # - Net prize: $90
-    # - If Pool A wins: each $1 bet on A gets ($1/$30) × $90 = $3.00
+    # - Fees: 10% = $10
+    # - If Pool A wins: each $1 bet on A gets $1 + ($1/$30) × $70 - fees
     
     if pool.pool_amount > 0:
-        # User's share of the winning pool
+        # Calculate losing pool total
+        losing_pool_total = pari_event.total_pool - pool.pool_amount
+        
+        # User gets their bet back + proportional share of losing money
         user_share_ratio = bet.amount / pool.pool_amount
-        # User gets their share of the entire net prize pool
-        user_payout = net_pool * user_share_ratio
-        return user_payout
+        share_of_losing_money = losing_pool_total * user_share_ratio
+        gross_payout = bet.amount + share_of_losing_money
+        
+        # Deduct fees proportionally for display
+        fee_amount = gross_payout * total_fee_percentage
+        net_payout = gross_payout - fee_amount
+        
+        return net_payout
     else:
         # Edge case: no money in this pool yet
         return bet.amount

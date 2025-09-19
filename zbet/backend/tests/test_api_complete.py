@@ -51,7 +51,7 @@ def test_api_endpoints():
                     print(f"      Min Bet: {system_data.get('minimum_bet')} ZEC")
                     print(f"      Max Bet: {system_data.get('maximum_bet')} ZEC")
                     print(f"      House Fee: {system_data.get('house_fee_percentage', 0) * 100}%")
-                    print(f"      Oracle Fee: {system_data.get('oracle_fee_percentage', 0) * 100}%")
+                    print(f"      Creator Fee: {system_data.get('creator_fee_percentage', 0) * 100}%")
                     print(f"      Total Pool: {system_data.get('total_pool')} ZEC")
                     
                     pools = system_data.get('betting_pools', [])

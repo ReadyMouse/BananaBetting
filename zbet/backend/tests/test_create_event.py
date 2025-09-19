@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from sqlalchemy.orm import sessionmaker
 from ..app.database import engine
 from ..app.models import (
-    SportEvent, PariMutuelEvent, PariMutuelPool, 
+    SportEvent, PariMutuelEvent, PariMutuelPool, User,
     EventStatus, BettingSystemType, EventCategory
 )
 
@@ -18,6 +18,17 @@ def create_sample_event():
     """Create a sample Savannah Bananas betting event"""
     db = SessionLocal()
     try:
+        # Create test user as event creator
+        creator = User(
+            username="event_creator",
+            email="creator@test.com",
+            hashed_password="hashed_password",
+            zcash_address="ztestsapling1creator123456789abcdefghijk",
+            zcash_transparent_address="t1creator123456789abcdefghijk"
+        )
+        db.add(creator)
+        db.flush()  # Get the ID
+        
         # Create base SportEvent
         sport_event = SportEvent(
             title="Will bananas be thrown onto the field?",
@@ -25,6 +36,7 @@ def create_sample_event():
             category=EventCategory.BANANA_ANTICS,
             status=EventStatus.OPEN,
             betting_system_type=BettingSystemType.PARI_MUTUEL,
+            creator_id=creator.id,
             event_start_time=datetime.now() + timedelta(hours=2),
             settlement_deadline=datetime.now() + timedelta(hours=6)
         )
@@ -43,7 +55,7 @@ def create_sample_event():
             minimum_bet=0.001,
             maximum_bet=1.0,
             house_fee_percentage=0.05,
-            oracle_fee_percentage=0.02
+            creator_fee_percentage=0.02
         )
         
         db.add(pari_event)
@@ -53,7 +65,7 @@ def create_sample_event():
         print(f"   Min bet: {pari_event.minimum_bet} ZEC")
         print(f"   Max bet: {pari_event.maximum_bet} ZEC")
         print(f"   House fee: {pari_event.house_fee_percentage * 100}%")
-        print(f"   Oracle fee: {pari_event.oracle_fee_percentage * 100}%")
+        print(f"   Creator fee: {pari_event.creator_fee_percentage * 100}%")
         
         # Create betting pools (the possible outcomes)
         pool_yes = PariMutuelPool(
