@@ -33,20 +33,32 @@ def create_user(db: Session, user: schemas.UserCreate):
     # zcash_utils.validate_zcash_address('address')
     # zcash_wallet.send_to_address('address', 0.1)
     
-    # Create real Zcash addresses - fail if node is not available
-    try:
-        zcash_account = zcash_wallet.z_get_new_account()
-        zcash_address = zcash_wallet.z_getaddressforaccount(zcash_account)
-        zcash_transparent_address = zcash_wallet.z_listunifiedreceivers(zcash_address, 'p2pkh')
-        zcash_transparent_balance = str(zcash_wallet.get_transparent_address_balance(zcash_transparent_address))
-    except Exception as e:
-        from .zcash_mod import ZCASH_RPC_URL
-        raise HTTPException(
-            status_code=503, 
-            detail=f"Failed to connect to Zcash node at {ZCASH_RPC_URL}. "
-                   f"Please ensure the Zcash node is running and accessible. "
-                   f"Error: {str(e)}"
-        )
+    # Check if Zcash node is disabled for development
+    from .zcash_mod import DISABLE_ZCASH_NODE
+    
+    if DISABLE_ZCASH_NODE:
+        # Use mock data when Zcash node is disabled
+        import random
+        zcash_account = random.randint(1000, 9999)  # Mock account number
+        zcash_address = f"mock_unified_address_{random.randint(10000, 99999)}"
+        zcash_transparent_address = f"tmMockAddress{random.randint(100000, 999999)}"
+        zcash_transparent_balance = "0.0"  # Mock balance
+        print(f"[DEVELOPMENT MODE] Created user with mock Zcash data: account={zcash_account}")
+    else:
+        # Create real Zcash addresses - fail if node is not available
+        try:
+            zcash_account = zcash_wallet.z_get_new_account()
+            zcash_address = zcash_wallet.z_getaddressforaccount(zcash_account)
+            zcash_transparent_address = zcash_wallet.z_listunifiedreceivers(zcash_address, 'p2pkh')
+            zcash_transparent_balance = str(zcash_wallet.get_transparent_address_balance(zcash_transparent_address))
+        except Exception as e:
+            from .zcash_mod import ZCASH_RPC_URL
+            raise HTTPException(
+                status_code=503, 
+                detail=f"Failed to connect to Zcash node at {ZCASH_RPC_URL}. "
+                       f"Please ensure the Zcash node is running and accessible. "
+                       f"Error: {str(e)}"
+            )
     
     db_user = models.User(email=user.email.lower(), username=user.username.lower(), zcash_account=zcash_account, zcash_address=zcash_address, zcash_transparent_address=zcash_transparent_address, hashed_password=hashed_password, balance=zcash_transparent_balance)
     db.add(db_user)

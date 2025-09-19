@@ -192,8 +192,9 @@ zcash_db_new_new.sqlite3
 # Alembic
 alembic.ini
 
-# Virtual environment (already covered above but being explicit)
-zchat/backend/venv/
-
 # Code for reference
 zchat*
+zchat/backend/venv/ # Virtual environment (already covered above but being explicit)
+
+# screenshots
+screenshots/*

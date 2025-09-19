@@ -169,6 +169,18 @@ def get_address(current_user: models.User = Depends(get_current_user)):
 @app.post("/zcash/validate-address/")
 def validate_address(address: str):
     """Validate a Zcash address"""
+    from .zcash_mod import DISABLE_ZCASH_NODE
+    
+    if DISABLE_ZCASH_NODE:
+        # Mock validation when Zcash node is disabled
+        is_valid = address.startswith(('t', 'z', 'u', 'mock_'))  # Simple mock validation
+        return {
+            "address": address,
+            "is_valid": is_valid,
+            "details": {"isvalid": is_valid, "type": "mock"},
+            "message": "Development mode: Mock validation"
+        }
+    
     try:
         result = zcash_utils.validate_zcash_address(address)
         return {
@@ -182,6 +194,19 @@ def validate_address(address: str):
 @app.get("/zcash/new-account/")
 def create_new_account(current_user: models.User = Depends(get_current_user)):
     """Create a new Zcash account (admin function)"""
+    from .zcash_mod import DISABLE_ZCASH_NODE
+    
+    if DISABLE_ZCASH_NODE:
+        # Return mock data when Zcash node is disabled
+        import random
+        account = random.randint(1000, 9999)
+        return {
+            "account": account,
+            "address": f"mock_unified_address_{random.randint(10000, 99999)}",
+            "transparent_address": f"tmMockAddress{random.randint(100000, 999999)}",
+            "message": "Development mode: Mock Zcash data returned"
+        }
+    
     try:
         account = zcash_wallet.z_get_new_account()
         address = zcash_wallet.z_getaddressforaccount(account)
