@@ -426,6 +426,49 @@ def settle_betting_event(
         raise HTTPException(status_code=500, detail="Failed to settle event")
 
 
+@app.post("/api/events/{event_id}/settle-with-consensus", response_model=schemas.SettlementResponse)
+def settle_event_with_consensus(
+    event_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """
+    Settle a betting event using validation consensus to determine the winning outcome.
+    
+    This endpoint:
+    1. Checks for validation consensus (minimum 3 validators, 60% agreement)
+    2. Uses the consensus outcome to settle the event automatically
+    3. Calculates payouts for all winning bets
+    4. Distributes validator rewards to users who validated correctly
+    5. Sends batch Zcash transactions to all recipients
+    6. Marks the event as settled
+    
+    Args:
+        event_id: ID of the event to settle
+        
+    Returns:
+        SettlementResponse with settlement details and payout information
+    """
+    try:
+        # TODO: Add authorization check - only event creators or admins should be able to settle events
+        # For now, any authenticated user can settle events (this should be restricted in production)
+        
+        # Process the consensus-based settlement
+        settlement_response = betting_utils.settle_event_with_consensus(
+            db=db,
+            event_id=event_id
+        )
+        
+        return settlement_response
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions from betting_utils
+        raise
+    except Exception as e:
+        print(f"Error settling event {event_id} with consensus: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to settle event with consensus")
+
+
 @app.get("/api/events/{event_id}/settlement", response_model=schemas.SettlementResponse | None)
 def get_event_settlement(
     event_id: int,
@@ -496,3 +539,144 @@ def get_event_settlement(
     except Exception as e:
         print(f"Error fetching settlement for event {event_id}: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to fetch settlement information")
+
+
+# Validation endpoints
+@app.post("/api/events/{event_id}/validate", response_model=schemas.ValidationResponse)
+def submit_validation(
+    event_id: int,
+    validation_request: schemas.ValidationRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """
+    Submit a validation result for a specific event.
+    
+    Users can validate the outcome of an event after it has ended but before
+    the settlement deadline. Each user can only validate each event once.
+    """
+    try:
+        # Get the sport event and validate it exists
+        sport_event = crud.get_sport_event(db, event_id)
+        if not sport_event:
+            raise HTTPException(status_code=404, detail="Event not found")
+        
+        # Check if event is in a valid state for validation
+        current_status = sport_event.get_current_status()
+        if current_status not in [models.EventStatus.CLOSED]:
+            raise HTTPException(
+                status_code=400, 
+                detail="Event must be closed to accept validations"
+            )
+        
+        # Check if event is already settled
+        if current_status == models.EventStatus.SETTLED:
+            raise HTTPException(status_code=400, detail="Event is already settled")
+        
+        # Check if user has already validated this event
+        existing_validation = crud.get_user_validation_for_event(db, current_user.id, event_id)
+        if existing_validation:
+            raise HTTPException(
+                status_code=400, 
+                detail="You have already validated this event"
+            )
+        
+        # Validate that the predicted outcome is valid for this event
+        betting_utils._validate_winning_outcome(db, sport_event, validation_request.predicted_outcome)
+        
+        # Create the validation result
+        validation_result = crud.create_validation_result(
+            db, current_user.id, event_id, validation_request
+        )
+        
+        # Transform to response format
+        return schemas.ValidationResponse(
+            id=validation_result.id,
+            user_id=validation_result.user_id,
+            sport_event_id=validation_result.sport_event_id,
+            predicted_outcome=validation_result.predicted_outcome,
+            validated_at=validation_result.validated_at.isoformat() + 'Z',
+            confidence_level=validation_result.confidence_level,
+            validation_notes=validation_result.validation_notes,
+            is_correct_validation=validation_result.is_correct_validation,
+            validator_reward_amount=validation_result.validator_reward_amount
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error submitting validation for event {event_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to submit validation")
+
+
+@app.get("/api/events/{event_id}/validation-summary", response_model=schemas.ValidationSummary)
+def get_validation_summary(
+    event_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Get validation summary for an event, including outcome counts and consensus.
+    """
+    try:
+        # Check if event exists
+        sport_event = crud.get_sport_event(db, event_id)
+        if not sport_event:
+            raise HTTPException(status_code=404, detail="Event not found")
+        
+        # Get validation summary
+        summary = crud.get_validation_summary(db, event_id)
+        
+        # Add settlement deadline if available
+        if sport_event.settlement_time:
+            summary.validation_deadline = sport_event.settlement_time.isoformat() + 'Z'
+        
+        return summary
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error fetching validation summary for event {event_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch validation summary")
+
+
+@app.get("/api/events/{event_id}/validations", response_model=list[schemas.ValidationResponse])
+def get_event_validations(
+    event_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """
+    Get all validation results for an event (admin only in the future).
+    For now, any authenticated user can view validations.
+    """
+    try:
+        # Check if event exists
+        sport_event = crud.get_sport_event(db, event_id)
+        if not sport_event:
+            raise HTTPException(status_code=404, detail="Event not found")
+        
+        # Get all validations for the event
+        validations = crud.get_validations_for_event(db, event_id)
+        
+        # Transform to response format
+        validation_responses = []
+        for validation in validations:
+            validation_responses.append(schemas.ValidationResponse(
+                id=validation.id,
+                user_id=validation.user_id,
+                sport_event_id=validation.sport_event_id,
+                predicted_outcome=validation.predicted_outcome,
+                validated_at=validation.validated_at.isoformat() + 'Z',
+                confidence_level=validation.confidence_level,
+                validation_notes=validation.validation_notes,
+                is_correct_validation=validation.is_correct_validation,
+                validator_reward_amount=validation.validator_reward_amount
+            ))
+        
+        return validation_responses
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error fetching validations for event {event_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch event validations")

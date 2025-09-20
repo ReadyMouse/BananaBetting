@@ -177,3 +177,39 @@ class SettlementResponse(BaseModel):
     
     class Config:
         from_attributes = True
+
+
+class ValidationRequest(BaseModel):
+    predicted_outcome: str
+    confidence_level: str | None = None  # "high", "medium", "low"
+    validation_notes: str | None = None
+    
+    class Config:
+        from_attributes = True
+
+
+class ValidationResponse(BaseModel):
+    id: int
+    user_id: int
+    sport_event_id: int
+    predicted_outcome: str
+    validated_at: str
+    confidence_level: str | None = None
+    validation_notes: str | None = None
+    is_correct_validation: bool | None = None
+    validator_reward_amount: float | None = None
+    
+    class Config:
+        from_attributes = True
+
+
+class ValidationSummary(BaseModel):
+    sport_event_id: int
+    total_validations: int
+    outcome_counts: dict[str, int]  # outcome -> count
+    consensus_outcome: str | None = None
+    consensus_percentage: float | None = None
+    validation_deadline: str | None = None
+    
+    class Config:
+        from_attributes = True

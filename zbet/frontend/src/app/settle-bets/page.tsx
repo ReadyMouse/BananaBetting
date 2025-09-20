@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { cn, getRandomBananaEmoji } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
+import { tokenManager } from '@/lib/api';
 import Disclaimer from '@/components/Disclaimer';
 
 // API Configuration
@@ -210,16 +211,50 @@ export default function SettleBetsPage() {
     }
 
     try {
-      // This would submit the settlement validation
-      // For now, just show a success message
-      alert(`Thank you for validating! Your settlement vote for "${selectedOutcome}" has been recorded. In the future, this will contribute to the consensus mechanism.`);
+      // Get authentication token
+      const token = tokenManager.getToken();
+      if (!token) {
+        alert('Authentication required. Please log in again.');
+        return;
+      }
+
+      // Submit validation to API
+      const response = await fetch(`${API_BASE_URL}/api/events/${eventId}/validate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          predicted_outcome: selectedOutcome,
+          confidence_level: 'high'  // Default to high confidence
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `HTTP ${response.status}: Failed to submit validation`);
+      }
+
+      const validationResult = await response.json();
       
-      // Remove from local state to simulate submission
+      // Success message
+      alert(`Thank you for validating! Your vote for "${selectedOutcome}" has been recorded and will contribute to the consensus mechanism.`);
+      
+      // Remove from local state since user has now validated this event
       setSettlableEvents(prev => prev.filter(event => event.id !== eventId));
       
+      // Clear the selected outcome for this event
+      setSelectedOutcomes(prev => {
+        const updated = { ...prev };
+        delete updated[eventId];
+        return updated;
+      });
+      
     } catch (err) {
-      console.error('Failed to submit settlement:', err);
-      alert('Failed to submit settlement validation. Please try again.');
+      console.error('Failed to submit validation:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to submit validation. Please try again.';
+      alert(errorMessage);
     }
   };
 

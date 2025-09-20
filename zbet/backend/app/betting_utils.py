@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import List, Dict, Any
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
-from . import models, schemas, serializers
+from . import models, schemas, serializers, crud
 from .zcash_mod import zcash_wallet
 from .config import settings
 
@@ -86,6 +86,59 @@ def process_bet_placement(db: Session, bet: models.Bet, sport_event: models.Spor
             status_code=400, 
             detail=f"Unsupported betting system: {sport_event.betting_system_type}"
         )
+
+
+def settle_event_with_consensus(db: Session, event_id: int, pool_address: str = None) -> schemas.SettlementResponse:
+    """
+    Settle an event using validation consensus to determine the winning outcome.
+    
+    Args:
+        db: Database session
+        event_id: ID of the event to settle
+        pool_address: Zcash address to send from (optional, uses config if not provided)
+        
+    Returns:
+        SettlementResponse with settlement details and payout records
+        
+    Raises:
+        HTTPException: If no consensus is reached or event cannot be settled
+    """
+    # Use configured pool address if none provided
+    if pool_address is None:
+        pool_address = settings.get_pool_address()
+    
+    # Get the event
+    sport_event = db.query(models.SportEvent).filter(models.SportEvent.id == event_id).first()
+    if not sport_event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    
+    # Check if event can be settled
+    current_status = sport_event.get_current_status()
+    if current_status == models.EventStatus.SETTLED:
+        raise HTTPException(status_code=400, detail="Event is already settled")
+    
+    if current_status not in [models.EventStatus.CLOSED]:
+        raise HTTPException(status_code=400, detail="Event must be closed for consensus settlement")
+    
+    # Check for validation consensus
+    consensus_outcome, consensus_percentage = crud.determine_consensus_outcome(db, event_id)
+    
+    if consensus_outcome is None:
+        # Check validation summary for better error message
+        summary = crud.get_validation_summary(db, event_id)
+        if summary.total_validations < 3:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Insufficient validations for consensus. Need at least 3, have {summary.total_validations}"
+            )
+        else:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"No consensus reached. Need 60% agreement, highest is {consensus_percentage:.1f}%"
+            )
+    
+    # Use the consensus outcome to settle the event
+    return settle_event(db, event_id, consensus_outcome, pool_address)
 
 
 def settle_event(db: Session, event_id: int, winning_outcome: str, pool_address: str = None) -> schemas.SettlementResponse:
@@ -354,18 +407,46 @@ def _process_event_payouts(db: Session, sport_event: models.SportEvent, winning_
             recipient_address=creator_address
         ))
     
-    # Create validator fee payout record if there are fees to collect
+    # Create validator fee payout records if there are fees to collect
     if total_validator_fees > 0:
-        # TODO: Implement validator reward distribution when validation system is ready
-        # For now, validator fees are calculated and reserved but not paid out
-        # until we have a system to determine which validators to reward.
-        # The fees will be held in the pool until validator distribution is implemented.
+        # Mark correct validations and calculate rewards
+        num_rewarded_validators = crud.mark_correct_validations_and_calculate_rewards(
+            db, sport_event.id, winning_outcome, total_validator_fees
+        )
         
-        # Note: When implementing validator rewards later, you'll need to:
-        # 1. Get list of validators who participated in outcome verification
-        # 2. Calculate their individual rewards (split total_validator_fees among them)
-        # 3. Create individual payout records for each validator's address
-        pass
+        if num_rewarded_validators > 0:
+            # Get all correct validations to create payout records
+            correct_validations = db.query(models.ValidationResult).filter(
+                models.ValidationResult.sport_event_id == sport_event.id,
+                models.ValidationResult.is_correct_validation == True
+            ).all()
+            
+            # Create individual payout records for each validator
+            for validation in correct_validations:
+                validator_payout = models.Payout(
+                    user_id=validation.user_id,
+                    bet_id=None,  # Not associated with a specific bet
+                    sport_event_id=sport_event.id,
+                    payout_amount=validation.validator_reward_amount,
+                    recipient_address=validation.user.zcash_address,
+                    payout_type="validator_fee",
+                    is_processed=False
+                )
+                db.add(validator_payout)
+                
+                # Add to response records
+                payout_records.append(schemas.PayoutRecord(
+                    user_id=validation.user_id,
+                    bet_id=None,
+                    payout_amount=validation.validator_reward_amount,
+                    payout_type="validator_fee",
+                    recipient_address=validation.user.zcash_address
+                ))
+        else:
+            # No validators to reward - fees remain in the pool
+            # This could happen if no one validated correctly
+            print(f"Warning: No validators to reward for event {sport_event.id}. Validator fees: {total_validator_fees}")
+            pass
     
     return payout_records
 

@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, Integer, String, Float, DateTime, ForeignKey, Text, Enum
+from sqlalchemy import Boolean, Column, Integer, String, Float, DateTime, ForeignKey, Text, Enum, Index
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import enum
@@ -22,6 +22,7 @@ class User(Base):
     # Relationships
     bets = relationship("Bet", back_populates="user")
     payouts = relationship("Payout", back_populates="user")
+    validation_results = relationship("ValidationResult", back_populates="user")
 
 
 # Enums for status fields
@@ -309,4 +310,36 @@ class Payout(Base):
     user = relationship("User", back_populates="payouts")
     bet = relationship("Bet", back_populates="payout")
     sport_event = relationship("SportEvent")
+
+
+class ValidationResult(Base):
+    __tablename__ = "validation_results"
+
+    id = Column(Integer, primary_key=True)
+    
+    # Foreign keys
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    sport_event_id = Column(Integer, ForeignKey("sport_events.id"), nullable=False)
+    
+    # Validation details
+    predicted_outcome = Column(String(50), nullable=False)  # The outcome the user believes is correct
+    validated_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    
+    # Validation metadata
+    confidence_level = Column(String(20), nullable=True)  # "high", "medium", "low" - for future use
+    validation_notes = Column(Text, nullable=True)  # Optional notes from validator
+    
+    # Reward tracking
+    is_correct_validation = Column(Boolean, nullable=True)  # Set after consensus is reached
+    validator_reward_amount = Column(Float, nullable=True)  # Set when rewards are calculated
+    
+    # Relationships
+    user = relationship("User", back_populates="validation_results")
+    sport_event = relationship("SportEvent")
+    
+    # Constraints to prevent duplicate validations
+    __table_args__ = (
+        # Each user can only validate each event once
+        Index('idx_user_event_unique', 'user_id', 'sport_event_id', unique=True),
+    )
 

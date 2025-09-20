@@ -161,3 +161,146 @@ def create_bet(db: Session, bet_data: schemas.BetPlacementRequest, user_id: int)
     return db_bet
 
 
+# Validation-related CRUD operations
+def create_validation_result(db: Session, user_id: int, sport_event_id: int, validation_data: schemas.ValidationRequest):
+    """Create a new validation result"""
+    db_validation = models.ValidationResult(
+        user_id=user_id,
+        sport_event_id=sport_event_id,
+        predicted_outcome=validation_data.predicted_outcome,
+        confidence_level=validation_data.confidence_level,
+        validation_notes=validation_data.validation_notes
+    )
+    
+    db.add(db_validation)
+    db.commit()
+    db.refresh(db_validation)
+    return db_validation
+
+
+def get_user_validation_for_event(db: Session, user_id: int, sport_event_id: int):
+    """Get a user's validation for a specific event"""
+    return db.query(models.ValidationResult).filter(
+        models.ValidationResult.user_id == user_id,
+        models.ValidationResult.sport_event_id == sport_event_id
+    ).first()
+
+
+def get_validations_for_event(db: Session, sport_event_id: int):
+    """Get all validations for a specific event"""
+    return db.query(models.ValidationResult).filter(
+        models.ValidationResult.sport_event_id == sport_event_id
+    ).all()
+
+
+def get_validation_summary(db: Session, sport_event_id: int) -> schemas.ValidationSummary:
+    """Get validation summary with outcome counts and consensus"""
+    validations = get_validations_for_event(db, sport_event_id)
+    
+    # Count outcomes
+    outcome_counts = {}
+    for validation in validations:
+        outcome = validation.predicted_outcome
+        outcome_counts[outcome] = outcome_counts.get(outcome, 0) + 1
+    
+    # Determine consensus (simple majority)
+    consensus_outcome = None
+    consensus_percentage = None
+    total_validations = len(validations)
+    
+    if total_validations > 0:
+        # Find the most common outcome
+        max_count = max(outcome_counts.values()) if outcome_counts else 0
+        consensus_outcomes = [outcome for outcome, count in outcome_counts.items() if count == max_count]
+        
+        if len(consensus_outcomes) == 1:  # Clear consensus
+            consensus_outcome = consensus_outcomes[0]
+            consensus_percentage = (max_count / total_validations) * 100
+    
+    return schemas.ValidationSummary(
+        sport_event_id=sport_event_id,
+        total_validations=total_validations,
+        outcome_counts=outcome_counts,
+        consensus_outcome=consensus_outcome,
+        consensus_percentage=consensus_percentage
+    )
+
+
+def determine_consensus_outcome(db: Session, sport_event_id: int, minimum_validations: int = 3, consensus_threshold: float = 0.6):
+    """
+    Determine if there's consensus on the outcome of an event.
+    
+    Args:
+        sport_event_id: The event to check
+        minimum_validations: Minimum number of validations required for consensus
+        consensus_threshold: Percentage of validations required for consensus (0.6 = 60%)
+    
+    Returns:
+        tuple: (consensus_outcome, consensus_percentage) or (None, None) if no consensus
+    """
+    validations = get_validations_for_event(db, sport_event_id)
+    
+    if len(validations) < minimum_validations:
+        return None, None
+    
+    # Count outcomes
+    outcome_counts = {}
+    for validation in validations:
+        outcome = validation.predicted_outcome
+        outcome_counts[outcome] = outcome_counts.get(outcome, 0) + 1
+    
+    # Find the most common outcome
+    if not outcome_counts:
+        return None, None
+    
+    max_count = max(outcome_counts.values())
+    consensus_outcomes = [outcome for outcome, count in outcome_counts.items() if count == max_count]
+    
+    # Check if there's a clear winner and it meets the threshold
+    if len(consensus_outcomes) == 1:
+        consensus_outcome = consensus_outcomes[0]
+        consensus_percentage = (max_count / len(validations)) * 100
+        
+        if consensus_percentage >= (consensus_threshold * 100):
+            return consensus_outcome, consensus_percentage
+    
+    return None, None
+
+
+def mark_correct_validations_and_calculate_rewards(db: Session, sport_event_id: int, winning_outcome: str, total_validator_fees: float):
+    """
+    Mark which validations were correct and calculate individual validator rewards.
+    
+    Args:
+        sport_event_id: The event that was settled
+        winning_outcome: The determined winning outcome
+        total_validator_fees: Total validator fees to distribute
+        
+    Returns:
+        Number of validators who get rewards
+    """
+    validations = get_validations_for_event(db, sport_event_id)
+    
+    # Find all correct validations
+    correct_validations = [v for v in validations if v.predicted_outcome == winning_outcome]
+    
+    if not correct_validations:
+        # No correct validations - validator fees remain unclaimed
+        return 0
+    
+    # Calculate reward per validator
+    reward_per_validator = total_validator_fees / len(correct_validations)
+    
+    # Update validation records
+    for validation in validations:
+        validation.is_correct_validation = (validation.predicted_outcome == winning_outcome)
+        if validation.is_correct_validation:
+            validation.validator_reward_amount = reward_per_validator
+        else:
+            validation.validator_reward_amount = 0.0
+    
+    db.commit()
+    
+    return len(correct_validations)
+
+
