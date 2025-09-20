@@ -58,7 +58,8 @@ def test_settle_pari_mutuel_event(db_session: Session):
         betting_system_type=models.BettingSystemType.PARI_MUTUEL,
         creator_id=user1.id,
         event_start_time=datetime.utcnow() + timedelta(hours=1),
-        settlement_deadline=datetime.utcnow() + timedelta(hours=6)
+        event_end_time=datetime.utcnow() + timedelta(hours=3),
+        settlement_time=datetime.utcnow() + timedelta(hours=6)
     )
     db_session.add(sport_event)
     db_session.commit()
@@ -70,6 +71,7 @@ def test_settle_pari_mutuel_event(db_session: Session):
         maximum_bet=100.0,
         house_fee_percentage=0.05,  # 5%
         creator_fee_percentage=0.02,  # 2%
+        validator_fee_percentage=0.02,  # 2%
         total_pool=0.0
     )
     db_session.add(pari_event)
@@ -214,7 +216,8 @@ def test_calculate_fees():
     pari_event = models.PariMutuelEvent(
         sport_event_id=1,
         house_fee_percentage=0.05,
-        creator_fee_percentage=0.02
+        creator_fee_percentage=0.02,
+        validator_fee_percentage=0.02
     )
     
     # Mock db session that returns pari_event

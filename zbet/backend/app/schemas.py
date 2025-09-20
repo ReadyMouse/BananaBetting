@@ -55,6 +55,7 @@ class PariMutuelEventResponse(BaseModel):
     maximum_bet: float
     house_fee_percentage: float
     creator_fee_percentage: float
+    validator_fee_percentage: float
     total_pool: float
     winning_outcome: str | None = None
     betting_pools: list[PariMutuelPoolResponse] = []
@@ -72,7 +73,8 @@ class SportEventResponse(BaseModel):
     betting_system_type: str
     created_at: str
     event_start_time: str
-    settlement_deadline: str
+    event_end_time: str
+    settlement_time: str  # Renamed from settlement_deadline for clarity
     settled_at: str | None = None
     betting_system_data: dict | None = None  # Generic field for any betting system data
 
@@ -87,7 +89,8 @@ class SportEventCreate(BaseModel):
     category: str
     betting_system_type: str
     event_start_time: str
-    settlement_deadline: str
+    event_end_time: str
+    settlement_time: str  # Renamed from settlement_deadline for clarity
 
 
 class PariMutuelPoolCreate(BaseModel):
@@ -154,7 +157,7 @@ class PayoutRecord(BaseModel):
     user_id: int | None = None  # Null for house/creator fees
     bet_id: int | None = None   # Null for house/creator fees
     payout_amount: float
-    payout_type: str = "user_winning"  # "user_winning", "house_fee", "creator_fee"
+    payout_type: str = "user_winning"  # "user_winning", "house_fee", "creator_fee", "validator_fee"
     recipient_address: str
     house_fee_deducted: float = 0.0
     creator_fee_deducted: float = 0.0

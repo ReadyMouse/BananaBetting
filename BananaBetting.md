@@ -50,7 +50,7 @@ Inspired by the Savanah Bannanas and Banana-ball, the dancing alternative to bas
 - **Location**: `database.py`, `models.py`
 - **Features**:
   - SQLite database with SQLAlchemy ORM
-  - User and Message models (can be extended)
+  - Complete betting system models (User, SportEvent, Bet, Payout, etc.)
   - Database migration support (Alembic)
   - Relationship handling
 

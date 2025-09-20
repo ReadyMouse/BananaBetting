@@ -71,7 +71,8 @@ def setup_test_data(db):
         betting_system_type=models.BettingSystemType.PARI_MUTUEL,
         creator_id=alice.id,
         event_start_time=datetime.utcnow() + timedelta(hours=2),
-        settlement_deadline=datetime.utcnow() + timedelta(hours=8)
+        event_end_time=datetime.utcnow() + timedelta(hours=4),
+        settlement_time=datetime.utcnow() + timedelta(hours=8)
     )
     db.add(sport_event)
     db.commit()
@@ -82,7 +83,8 @@ def setup_test_data(db):
         minimum_bet=0.1,
         maximum_bet=50.0,
         house_fee_percentage=0.05,  # 5% house fee
-        creator_fee_percentage=0.02,  # 2% creator fee  
+        creator_fee_percentage=0.02,  # 2% creator fee
+        validator_fee_percentage=0.02,  # 2% validator fee
         total_pool=0.0
     )
     db.add(pari_event)

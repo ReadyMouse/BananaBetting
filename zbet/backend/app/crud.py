@@ -83,9 +83,11 @@ def get_sport_event(db: Session, event_id: int):
 
 def create_sport_event(db: Session, event_data: schemas.SportEventCreate, creator_id: int):
     """Create a new sport event"""
-    # Convert string datetime to timezone-naive datetime objects
-    event_start_time = datetime.fromisoformat(event_data.event_start_time.replace('Z', '+00:00')).replace(tzinfo=None)
-    settlement_deadline = datetime.fromisoformat(event_data.settlement_deadline.replace('Z', '+00:00')).replace(tzinfo=None)
+    # Parse datetime strings as EST (no timezone conversion)
+    # All times in the system are stored and displayed in EST
+    event_start_time = datetime.fromisoformat(event_data.event_start_time)
+    event_end_time = datetime.fromisoformat(event_data.event_end_time)
+    settlement_time = datetime.fromisoformat(event_data.settlement_time)
     
     db_event = models.SportEvent(
         title=event_data.title,
@@ -94,7 +96,8 @@ def create_sport_event(db: Session, event_data: schemas.SportEventCreate, creato
         betting_system_type=models.BettingSystemType(event_data.betting_system_type),
         creator_id=creator_id,
         event_start_time=event_start_time,
-        settlement_deadline=settlement_deadline,
+        event_end_time=event_end_time,
+        settlement_time=settlement_time,
         status=models.EventStatus.OPEN
     )
     
@@ -112,7 +115,8 @@ def create_pari_mutuel_event(db: Session, sport_event_id: int, pari_mutuel_data:
         minimum_bet=0.001,  # Default minimum bet
         maximum_bet=1.0,    # Default maximum bet
         house_fee_percentage=0.05,  # Default 5% house fee
-        creator_fee_percentage=0.02  # Default 2% creator fee
+        creator_fee_percentage=0.02,  # Default 2% creator fee
+        validator_fee_percentage=0.02  # Default 2% validator fee
     )
     
     db.add(db_pari_event)

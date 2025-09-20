@@ -57,8 +57,12 @@ def update_pari_mutuel_pool_stats(db: Session, bet: models.Bet, sport_event: mod
 
 def validate_bet_for_event(sport_event: models.SportEvent, predicted_outcome: str, amount: float):
     """Validate that a bet can be placed on the given event"""
-    if sport_event.status != models.EventStatus.OPEN:
-        raise HTTPException(status_code=400, detail="Betting is not open for this event")
+    current_status = sport_event.get_current_status()
+    if current_status != models.EventStatus.OPEN:
+        if current_status == models.EventStatus.CLOSED:
+            raise HTTPException(status_code=400, detail="Event has ended - betting is now closed")
+        else:
+            raise HTTPException(status_code=400, detail="Betting is not open for this event")
     
     if amount <= 0:
         raise HTTPException(status_code=400, detail="Bet amount must be positive")
@@ -106,10 +110,11 @@ def settle_event(db: Session, event_id: int, winning_outcome: str, pool_address:
         raise HTTPException(status_code=404, detail="Event not found")
     
     # Check if event can be settled
-    if sport_event.status == models.EventStatus.SETTLED:
+    current_status = sport_event.get_current_status()
+    if current_status == models.EventStatus.SETTLED:
         raise HTTPException(status_code=400, detail="Event is already settled")
     
-    if sport_event.status != models.EventStatus.OPEN:
+    if current_status not in [models.EventStatus.OPEN, models.EventStatus.CLOSED]:
         raise HTTPException(status_code=400, detail="Event is not open for settlement")
     
     # Validate winning outcome exists for this event
@@ -136,7 +141,10 @@ def settle_event(db: Session, event_id: int, winning_outcome: str, pool_address:
     
     # Mark event as settled
     sport_event.status = models.EventStatus.SETTLED
-    sport_event.settled_at = datetime.utcnow()
+    # Set settlement time in EST
+    from datetime import timezone, timedelta
+    est_timezone = timezone(timedelta(hours=-5))
+    sport_event.settled_at = datetime.now(est_timezone).replace(tzinfo=None)
     
     # Mark winning outcome in pari-mutuel event if applicable
     if sport_event.betting_system_type == models.BettingSystemType.PARI_MUTUEL:
@@ -237,6 +245,7 @@ def _process_event_payouts(db: Session, sport_event: models.SportEvent, winning_
     # Calculate total fees once for the entire event
     total_house_fees = 0.0
     total_creator_fees = 0.0
+    total_validator_fees = 0.0
     
     if sport_event.betting_system_type == models.BettingSystemType.PARI_MUTUEL:
         pari_event = db.query(models.PariMutuelEvent).filter(
@@ -257,6 +266,7 @@ def _process_event_payouts(db: Session, sport_event: models.SportEvent, winning_
                 if losing_pool_gross > 0:
                     total_house_fees = losing_pool_gross * pari_event.house_fee_percentage
                     total_creator_fees = losing_pool_gross * pari_event.creator_fee_percentage
+                    total_validator_fees = losing_pool_gross * pari_event.validator_fee_percentage
 
     # Process all bets
     for bet in bets:
@@ -344,6 +354,19 @@ def _process_event_payouts(db: Session, sport_event: models.SportEvent, winning_
             recipient_address=creator_address
         ))
     
+    # Create validator fee payout record if there are fees to collect
+    if total_validator_fees > 0:
+        # TODO: Implement validator reward distribution when validation system is ready
+        # For now, validator fees are calculated and reserved but not paid out
+        # until we have a system to determine which validators to reward.
+        # The fees will be held in the pool until validator distribution is implemented.
+        
+        # Note: When implementing validator rewards later, you'll need to:
+        # 1. Get list of validators who participated in outcome verification
+        # 2. Calculate their individual rewards (split total_validator_fees among them)
+        # 3. Create individual payout records for each validator's address
+        pass
+    
     return payout_records
 
 
@@ -388,7 +411,7 @@ def _calculate_settlement_payout(db: Session, sport_event: models.SportEvent, be
         # Payout = Original Bet + (User's Bet / Winning Pool) × (Losing Pools - Fees)
         
         # Deduct fees from the losing pool (fees come off the top)
-        total_fee_percentage = pari_event.house_fee_percentage + pari_event.creator_fee_percentage
+        total_fee_percentage = pari_event.house_fee_percentage + pari_event.creator_fee_percentage + pari_event.validator_fee_percentage
         losing_pool_after_fees = losing_pool_gross * (1 - total_fee_percentage)
         
         # User gets their bet back + proportional share of net losing money

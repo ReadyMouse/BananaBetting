@@ -12,8 +12,8 @@ import {
   LogOut, 
   Menu, 
   X,
-  Wallet,
-  Trophy
+  Trophy,
+  Scale
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { cn, getRandomBananaEmoji } from '@/lib/utils';
@@ -42,6 +42,12 @@ const navigationItems = [
     href: '/my-bets',
     icon: TrendingUp,
     emoji: '📈'
+  },
+  {
+    name: 'Settle Bets',
+    href: '/settle-bets',
+    icon: Scale,
+    emoji: '⚖️'
   },
   {
     name: 'Profile', // This will be dynamically replaced with username
@@ -215,13 +221,6 @@ export default function Navigation() {
 
               {/* User Menu */}
               <div className="flex items-center space-x-4">
-                <div className="flex items-center space-x-3 px-4 py-2 bg-banana-400 rounded-lg">
-                  <Wallet size={20} className="text-baseball-800" />
-                  <span className="font-medium text-baseball-800">
-                    {user?.balance ? `${parseFloat(user.balance).toFixed(4)} ZEC` : '0.0000 ZEC'}
-                  </span>
-                </div>
-
                 <button
                   onClick={handleLogout}
                   className="p-2 text-baseball-800 hover:bg-banana-400 rounded-lg transition-colors"

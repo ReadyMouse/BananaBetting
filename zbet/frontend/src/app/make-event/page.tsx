@@ -65,7 +65,8 @@ interface FormData {
   category: string;
   betting_system_type: string;
   event_start_time: string;
-  settlement_deadline: string;
+  event_end_time: string;
+  settlement_time: string;
   // Pari-mutuel specific fields
   betting_pools: PariMutuelPool[];
 }
@@ -84,7 +85,8 @@ export default function MakeEventPage() {
     category: 'banana-antics',
     betting_system_type: 'pari_mutuel',
     event_start_time: '',
-    settlement_deadline: '',
+    event_end_time: '',
+    settlement_time: '',
     betting_pools: [
       { outcome_name: 'option_a', outcome_description: 'Option A' },
       { outcome_name: 'option_b', outcome_description: 'Option B' }
@@ -94,15 +96,33 @@ export default function MakeEventPage() {
   useEffect(() => {
     setEmoji(getRandomBananaEmoji());
     
-    // Set default times (event in 2 hours, settlement 1 hour after event)
+    // Set default times (event in 2 hours, event lasts 1 hour, settlement 2 hours after event ends)
+    // All times are in EST timezone
     const now = new Date();
-    const eventTime = new Date(now.getTime() + 2 * 60 * 60 * 1000); // 2 hours from now
-    const settlementTime = new Date(eventTime.getTime() + 1 * 60 * 60 * 1000); // 1 hour after event
+    
+    // Convert current time to EST
+    const nowInEST = new Date(now.toLocaleString("en-US", {timeZone: "America/New_York"}));
+    
+    // Calculate default times in EST
+    const eventStartTime = new Date(nowInEST.getTime() + 2 * 60 * 60 * 1000); // 2 hours from now
+    const eventEndTime = new Date(eventStartTime.getTime() + 1 * 60 * 60 * 1000); // 1 hour after start
+    const settlementTime = new Date(eventEndTime.getTime() + 2 * 60 * 60 * 1000); // 2 hours after event ends
+    
+    // Format for datetime-local input (YYYY-MM-DDTHH:MM format)
+    const formatForLocalInput = (date: Date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      return `${year}-${month}-${day}T${hours}:${minutes}`;
+    };
     
     setFormData(prev => ({
       ...prev,
-      event_start_time: eventTime.toISOString().slice(0, 16), // Format for datetime-local input
-      settlement_deadline: settlementTime.toISOString().slice(0, 16)
+      event_start_time: formatForLocalInput(eventStartTime),
+      event_end_time: formatForLocalInput(eventEndTime),
+      settlement_time: formatForLocalInput(settlementTime)
     }));
   }, []);
 
@@ -167,14 +187,17 @@ export default function MakeEventPage() {
     if (!formData.title.trim()) return 'Title is required';
     if (!formData.description.trim()) return 'Description is required';
     if (!formData.event_start_time) return 'Event start time is required';
-    if (!formData.settlement_deadline) return 'Settlement deadline is required';
+    if (!formData.event_end_time) return 'Event end time is required';
+    if (!formData.settlement_time) return 'Settlement time is required';
     
-    const eventTime = new Date(formData.event_start_time);
-    const settlementTime = new Date(formData.settlement_deadline);
+    const eventStartTime = new Date(formData.event_start_time);
+    const eventEndTime = new Date(formData.event_end_time);
+    const settlementTime = new Date(formData.settlement_time);
     const now = new Date();
     
-    if (eventTime <= now) return 'Event start time must be in the future';
-    if (settlementTime <= eventTime) return 'Settlement deadline must be after event start time';
+    if (eventStartTime <= now) return 'Event start time must be in the future';
+    if (eventEndTime <= eventStartTime) return 'Event end time must be after event start time';
+    if (settlementTime <= eventEndTime) return 'Settlement time must be after event end time';
     
     if (formData.betting_system_type === 'pari_mutuel') {
       for (let i = 0; i < formData.betting_pools.length; i++) {
@@ -208,13 +231,15 @@ export default function MakeEventPage() {
     
     try {
       // Transform the form data to match the API expectations
+      // Keep everything in EST - no timezone conversion needed
       const eventData = {
         title: formData.title.trim(),
         description: formData.description.trim(),
         category: formData.category,
         betting_system_type: formData.betting_system_type,
-        event_start_time: new Date(formData.event_start_time).toISOString(),
-        settlement_deadline: new Date(formData.settlement_deadline).toISOString()
+        event_start_time: formData.event_start_time + ':00', // Add seconds for complete ISO format
+        event_end_time: formData.event_end_time + ':00',
+        settlement_time: formData.settlement_time + ':00'
       };
       
       // Pari-mutuel specific data
@@ -237,7 +262,8 @@ export default function MakeEventPage() {
 
       console.log('Sending create event request:', {
         url: `${API_BASE_URL}/api/events`,
-        body: requestBody
+        body: requestBody,
+        note: 'Times are converted from EST input to UTC for backend storage'
       });
 
       const response = await fetch(`${API_BASE_URL}/api/events`, {
@@ -453,11 +479,11 @@ export default function MakeEventPage() {
               <span>Event Timing</span>
             </h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {/* Event Start Time */}
               <div>
                 <label className="block text-sm font-medium text-baseball-700 mb-2">
-                  Event Start Time *
+                  Event Start Time * (EST)
                 </label>
                 <input
                   type="datetime-local"
@@ -465,21 +491,35 @@ export default function MakeEventPage() {
                   onChange={(e) => handleInputChange('event_start_time', e.target.value)}
                   className="w-full px-4 py-3 border border-banana-300 rounded-lg focus:ring-2 focus:ring-banana-500 focus:border-banana-500 transition-colors text-gray-900"
                 />
-                <p className="text-sm text-baseball-600 mt-1">When the actual event begins</p>
+                <p className="text-sm text-baseball-600 mt-1">When the actual event begins (Eastern Time)</p>
               </div>
 
-              {/* Settlement Deadline */}
+              {/* Event End Time */}
               <div>
                 <label className="block text-sm font-medium text-baseball-700 mb-2">
-                  Settlement Deadline *
+                  Event End Time * (EST)
                 </label>
                 <input
                   type="datetime-local"
-                  value={formData.settlement_deadline}
-                  onChange={(e) => handleInputChange('settlement_deadline', e.target.value)}
+                  value={formData.event_end_time}
+                  onChange={(e) => handleInputChange('event_end_time', e.target.value)}
                   className="w-full px-4 py-3 border border-banana-300 rounded-lg focus:ring-2 focus:ring-banana-500 focus:border-banana-500 transition-colors text-gray-900"
                 />
-                <p className="text-sm text-baseball-600 mt-1">When the event outcome must be determined</p>
+                <p className="text-sm text-baseball-600 mt-1">When the actual event ends (Eastern Time)</p>
+              </div>
+
+              {/* Settlement Time */}
+              <div>
+                <label className="block text-sm font-medium text-baseball-700 mb-2">
+                  Settlement Time * (EST)
+                </label>
+                <input
+                  type="datetime-local"
+                  value={formData.settlement_time}
+                  onChange={(e) => handleInputChange('settlement_time', e.target.value)}
+                  className="w-full px-4 py-3 border border-banana-300 rounded-lg focus:ring-2 focus:ring-banana-500 focus:border-banana-500 transition-colors text-gray-900"
+                />
+                <p className="text-sm text-baseball-600 mt-1">When the event outcome must be determined and payouts processed (Eastern Time)</p>
               </div>
             </div>
           </div>

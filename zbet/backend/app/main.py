@@ -210,17 +210,24 @@ def create_betting_event(
             raise HTTPException(status_code=400, detail="Event description is required")
         
         # Validate datetime strings and ensure they're in the future
+        # All times are handled in EST timezone
         try:
-            event_start_time = datetime.fromisoformat(event_data.event_start_time.replace('Z', '+00:00')).replace(tzinfo=None)
-            settlement_deadline = datetime.fromisoformat(event_data.settlement_deadline.replace('Z', '+00:00')).replace(tzinfo=None)
+            event_start_time = datetime.fromisoformat(event_data.event_start_time)
+            event_end_time = datetime.fromisoformat(event_data.event_end_time)
+            settlement_time = datetime.fromisoformat(event_data.settlement_time)
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid datetime format")
         
-        now = datetime.utcnow()
+        # Get current time in EST for comparison
+        from datetime import timezone, timedelta
+        est_timezone = timezone(timedelta(hours=-5))  # EST is UTC-5
+        now = datetime.now(est_timezone).replace(tzinfo=None)
         if event_start_time <= now:
             raise HTTPException(status_code=400, detail="Event start time must be in the future")
-        if settlement_deadline <= event_start_time:
-            raise HTTPException(status_code=400, detail="Settlement deadline must be after event start time")
+        if event_end_time <= event_start_time:
+            raise HTTPException(status_code=400, detail="Event end time must be after event start time")
+        if settlement_time <= event_end_time:
+            raise HTTPException(status_code=400, detail="Settlement time must be after event end time")
         
         # Validate category
         try:

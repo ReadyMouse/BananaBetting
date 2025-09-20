@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Clock, TrendingUp, DollarSign, Users } from 'lucide-react';
+import { ArrowLeft, Clock, TrendingUp, DollarSign, Users, Play, Square, CheckCircle } from 'lucide-react';
 import { cn, getRandomBananaEmoji } from '@/lib/utils';
 import { bettingApi } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
@@ -38,7 +38,8 @@ function adaptPariMutuelData(systemData: any): BettingDisplayData {
   const pools = systemData?.betting_pools || [];
   const houseFee = systemData?.house_fee_percentage || 0.05;
   const creatorFee = systemData?.creator_fee_percentage || 0.02;
-  const netPool = totalPool * (1 - houseFee - creatorFee);
+  const validatorFee = systemData?.validator_fee_percentage || 0.02;
+  const netPool = totalPool * (1 - houseFee - creatorFee - validatorFee);
   
   // Calculate pool percentages and estimated payouts
   const poolData = pools.map((pool: any) => {
@@ -76,7 +77,7 @@ function adaptPariMutuelData(systemData: any): BettingDisplayData {
       poolName: pool.name,
       outcomeId: pool.name  // Add the actual outcome name for betting
     })),
-    fees: `House ${(houseFee * 100).toFixed(1)}% + Creator ${(creatorFee * 100).toFixed(1)}%`
+    fees: `House ${(houseFee * 100).toFixed(1)}% + Creator ${(creatorFee * 100).toFixed(1)}% + Validators ${(validatorFee * 100).toFixed(1)}%`
   };
 }
 
@@ -238,7 +239,8 @@ export default function IndividualBettingPage() {
         emoji: categoryEmojis[event.category] || '🎪',
         participants: systemData?.betting_pools?.reduce((sum: number, pool: any) => sum + pool.bet_count, 0) || 0,
         eventStartTime: event.event_start_time,
-        settlementDeadline: event.settlement_deadline
+        eventEndTime: event.event_end_time,
+        settlementTime: event.settlement_time
       };
       
       setBet(transformedBet);
@@ -322,6 +324,9 @@ export default function IndividualBettingPage() {
 
   const minBet = bet.bettingDisplay.secondaryMetrics?.find((m: any) => m.label.includes('Range'))?.value?.split(' - ')[0] || '0.001';
   const maxBet = bet.bettingDisplay.secondaryMetrics?.find((m: any) => m.label.includes('Range'))?.value?.split(' - ')[1]?.replace(' ZEC', '') || '1.0';
+  
+  // Check if betting is allowed based on event status
+  const isBettingClosed = bet.status === 'closed' || bet.status === 'settled' || bet.status === 'cancelled';
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-banana-50 via-banana-100 to-grass-50">
@@ -401,7 +406,67 @@ export default function IndividualBettingPage() {
                     <TrendingUp size={16} />
                     <span className="text-sm">Status</span>
                   </div>
-                  <div className="text-lg font-bold text-grass-600 capitalize">{bet.status}</div>
+                  <div className={`text-lg font-bold capitalize ${
+                    bet.status === 'open' ? 'text-grass-600' :
+                    bet.status === 'closed' ? 'text-orange-600' :
+                    bet.status === 'settled' ? 'text-blue-600' :
+                    'text-red-600'
+                  }`}>{bet.status}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Event Timing */}
+            <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-banana-200">
+              <h3 className="text-lg font-bold text-baseball-800 mb-4">Event Timeline</h3>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2 text-grass-600">
+                    <Play size={16} />
+                    <span className="text-sm font-medium">Start Time (EST)</span>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-baseball-800 font-medium">
+                      {new Date(bet.eventStartTime).toLocaleDateString()}
+                    </div>
+                    <div className="text-sm text-baseball-500">
+                      {new Date(bet.eventStartTime).toLocaleTimeString()}
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="h-px bg-banana-200"></div>
+                
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2 text-orange-600">
+                    <Square size={16} />
+                    <span className="text-sm font-medium">End Time (EST)</span>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-baseball-800 font-medium">
+                      {new Date(bet.eventEndTime).toLocaleDateString()}
+                    </div>
+                    <div className="text-sm text-baseball-500">
+                      {new Date(bet.eventEndTime).toLocaleTimeString()}
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="h-px bg-banana-200"></div>
+                
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2 text-purple-600">
+                    <CheckCircle size={16} />
+                    <span className="text-sm font-medium">Settlement Time (EST)</span>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-baseball-800 font-medium">
+                      {new Date(bet.settlementTime).toLocaleDateString()}
+                    </div>
+                    <div className="text-sm text-baseball-500">
+                      {new Date(bet.settlementTime).toLocaleTimeString()}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -417,16 +482,28 @@ export default function IndividualBettingPage() {
             {/* Outcome Selection */}
             <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-banana-200">
               <h3 className="text-lg font-bold text-baseball-800 mb-4">Choose Your Outcome</h3>
+              {isBettingClosed && (
+                <div className="mb-4 p-3 bg-orange-100 border border-orange-300 rounded-lg">
+                  <p className="text-orange-800 text-sm font-medium">
+                    {bet.status === 'closed' ? 'Event has ended - betting is now closed' :
+                     bet.status === 'settled' ? 'Event has been settled' :
+                     'Betting is not available for this event'}
+                  </p>
+                </div>
+              )}
               <div className="space-y-3">
                 {bet.bettingDisplay.additionalInfo?.map((outcome: any, index: number) => (
                   <motion.button
                     key={index}
-                    onClick={() => setSelectedOutcome(outcome.outcomeId || outcome.label)}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
+                    onClick={() => !isBettingClosed && setSelectedOutcome(outcome.outcomeId || outcome.label)}
+                    whileHover={{ scale: isBettingClosed ? 1 : 1.02 }}
+                    whileTap={{ scale: isBettingClosed ? 1 : 0.98 }}
+                    disabled={isBettingClosed}
                     className={cn(
                       'w-full p-4 border rounded-lg text-left transition-all',
-                      selectedOutcome === (outcome.outcomeId || outcome.label)
+                      isBettingClosed 
+                        ? 'border-gray-300 bg-gray-50 cursor-not-allowed opacity-60'
+                        : selectedOutcome === (outcome.outcomeId || outcome.label)
                         ? 'border-banana-500 bg-banana-50 ring-2 ring-banana-200'
                         : 'border-banana-200 hover:border-banana-300 hover:bg-banana-25'
                     )}
@@ -463,7 +540,12 @@ export default function IndividualBettingPage() {
                     max={maxBet}
                     step="0.001"
                     placeholder={`${minBet} - ${maxBet} ZEC`}
-                    className="w-full px-4 py-3 border border-banana-300 rounded-lg focus:ring-2 focus:ring-banana-500 focus:border-banana-500 text-lg"
+                    disabled={isBettingClosed}
+                    className={`w-full px-4 py-3 border rounded-lg text-lg ${
+                      isBettingClosed 
+                        ? 'border-gray-300 bg-gray-50 cursor-not-allowed opacity-60'
+                        : 'border-banana-300 focus:ring-2 focus:ring-banana-500 focus:border-banana-500'
+                    }`}
                   />
                   <div className="text-sm text-baseball-500 mt-1">
                     Range: {minBet} - {maxBet} ZEC
@@ -487,6 +569,18 @@ export default function IndividualBettingPage() {
                   >
                     <span>Login to Place Bet</span>
                     <span className="text-xl">🔒</span>
+                  </motion.button>
+                ) : isBettingClosed ? (
+                  <motion.button
+                    disabled={true}
+                    className="w-full bg-gray-400 text-white font-bold py-4 px-6 rounded-lg cursor-not-allowed opacity-60 transition-colors flex items-center justify-center space-x-3 text-lg"
+                  >
+                    <span>
+                      {bet.status === 'closed' ? 'Event Closed' :
+                       bet.status === 'settled' ? 'Event Settled' :
+                       'Betting Unavailable'}
+                    </span>
+                    <span className="text-xl">🚫</span>
                   </motion.button>
                 ) : (
                   <motion.button

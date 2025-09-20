@@ -38,7 +38,8 @@ def create_sample_event():
             betting_system_type=BettingSystemType.PARI_MUTUEL,
             creator_id=creator.id,
             event_start_time=datetime.now() + timedelta(hours=2),
-            settlement_deadline=datetime.now() + timedelta(hours=6)
+            event_end_time=datetime.now() + timedelta(hours=4),
+            settlement_time=datetime.now() + timedelta(hours=6)
         )
         
         db.add(sport_event)
@@ -55,7 +56,8 @@ def create_sample_event():
             minimum_bet=0.001,
             maximum_bet=1.0,
             house_fee_percentage=0.05,
-            creator_fee_percentage=0.02
+            creator_fee_percentage=0.02,
+            validator_fee_percentage=0.02
         )
         
         db.add(pari_event)

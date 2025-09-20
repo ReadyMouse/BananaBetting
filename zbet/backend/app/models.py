@@ -72,14 +72,37 @@ class SportEvent(Base):
     betting_system_type = Column(Enum(BettingSystemType), nullable=False)
     creator_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     
-    # Event timing
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    event_start_time = Column(DateTime, nullable=False)
-    settlement_deadline = Column(DateTime, nullable=False)
-    settled_at = Column(DateTime, nullable=True)
+    # Event timing (all times stored in EST)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)  # Keep UTC for creation time
+    event_start_time = Column(DateTime, nullable=False)  # Stored in EST
+    event_end_time = Column(DateTime, nullable=False)  # Stored in EST
+    settlement_time = Column(DateTime, nullable=False)  # Stored in EST
+    settled_at = Column(DateTime, nullable=True)  # Will be set in EST when settled
     
     # Relationships
     creator = relationship("User")
+    
+    def get_current_status(self):
+        """Calculate the current status based on timing and stored status"""
+        # If event is already settled or cancelled, return as is
+        if self.status in [EventStatus.SETTLED, EventStatus.CANCELLED]:
+            return self.status
+        
+        from datetime import datetime, timezone, timedelta
+        
+        # Get current time in Eastern timezone
+        # For simplicity, we'll use UTC-4 (EDT) since it's currently daylight saving time
+        # In production, you'd want to use a proper timezone library
+        eastern_offset = timedelta(hours=-4)  # EDT (Eastern Daylight Time)
+        eastern_tz = timezone(eastern_offset)
+        now_eastern = datetime.now(eastern_tz).replace(tzinfo=None)
+        
+        # If current time is past event end time, event should be closed
+        if now_eastern > self.event_end_time:
+            return EventStatus.CLOSED
+        
+        # Otherwise, return the stored status (likely OPEN)
+        return self.status
     
     # Serialization methods
     def to_dict(self, db_session):
@@ -89,11 +112,12 @@ class SportEvent(Base):
             "title": self.title,
             "description": self.description,
             "category": self.category.value,
-            "status": self.status.value,
+            "status": self.get_current_status().value,
             "betting_system_type": self.betting_system_type.value,
             "created_at": self.created_at.isoformat(),
             "event_start_time": self.event_start_time.isoformat(),
-            "settlement_deadline": self.settlement_deadline.isoformat(),
+            "event_end_time": self.event_end_time.isoformat(),
+            "settlement_time": self.settlement_time.isoformat(),
             "settled_at": self.settled_at.isoformat() if self.settled_at else None
         }
         
@@ -122,6 +146,7 @@ class PariMutuelEvent(Base):
     maximum_bet = Column(Float, nullable=False, default=1.0)
     house_fee_percentage = Column(Float, default=0.05, nullable=False)  # 5% default house fee
     creator_fee_percentage = Column(Float, default=0.02, nullable=False)  # 2% default creator fee
+    validator_fee_percentage = Column(Float, default=0.02, nullable=False)  # 2% default validator fee
     
     # Relationships
     betting_pools = relationship("PariMutuelPool", back_populates="pari_mutuel_event")
@@ -144,6 +169,7 @@ class PariMutuelEvent(Base):
             "maximum_bet": self.maximum_bet,
             "house_fee_percentage": self.house_fee_percentage,
             "creator_fee_percentage": self.creator_fee_percentage,
+            "validator_fee_percentage": self.validator_fee_percentage,
             "total_pool": self.total_pool,
             "winning_outcome": self.winning_outcome,
             "betting_pools": [pool.to_dict() for pool in pools]
@@ -264,7 +290,7 @@ class Payout(Base):
     sport_event_id = Column(Integer, ForeignKey("sport_events.id"), nullable=False)
     
     # Payout type to distinguish between user winnings and fee collections
-    payout_type = Column(String(20), nullable=False, default="user_winning")  # "user_winning", "house_fee", "creator_fee"
+    payout_type = Column(String(20), nullable=False, default="user_winning")  # "user_winning", "house_fee", "creator_fee", "validator_fee"
     
     # Payout details
     payout_amount = Column(Float, nullable=False)  # Amount in ZEC

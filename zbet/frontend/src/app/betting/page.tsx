@@ -36,7 +36,8 @@ function adaptPariMutuelData(systemData: BettingSystemData): BettingDisplayData 
   const pools = systemData?.betting_pools || [];
   const houseFee = systemData?.house_fee_percentage || 0.05;
   const creatorFee = systemData?.creator_fee_percentage || 0.02;
-  const netPool = totalPool * (1 - houseFee - creatorFee);
+  const validatorFee = systemData?.validator_fee_percentage || 0.02;
+  const netPool = totalPool * (1 - houseFee - creatorFee - validatorFee);
   
   // Calculate pool percentages and estimated payouts
   const poolData = pools.map(pool => {
@@ -72,7 +73,7 @@ function adaptPariMutuelData(systemData: BettingSystemData): BettingDisplayData 
       subtext: `${pool.amount.toFixed(4)} ZEC (${pool.betCount} bets)${pool.estimatedPayout > 0 ? ` • Est. ${pool.estimatedPayout.toFixed(2)}:1` : ''}`,
       outcomeId: pool.name  // Add the actual outcome name for betting
     })),
-    fees: `House ${(houseFee * 100).toFixed(1)}% + Creator ${(creatorFee * 100).toFixed(1)}%`
+    fees: `House ${(houseFee * 100).toFixed(1)}% + Creator ${(creatorFee * 100).toFixed(1)}% + Validators ${(validatorFee * 100).toFixed(1)}%`
   };
 }
 
@@ -202,7 +203,8 @@ interface SportEvent {
   betting_system_type: string;
   created_at: string;
   event_start_time: string;
-  settlement_deadline: string;
+  event_end_time: string;
+  settlement_time: string;
   settled_at?: string;
   betting_system_data?: BettingSystemData;
 }
@@ -474,8 +476,18 @@ export default function BettingPage() {
               >
                 {/* Card Header */}
                 <div className="flex items-center justify-between mb-4">
-                  <div className="text-3xl group-hover:scale-110 transition-transform">
-                    {bet.emoji}
+                  <div className="flex items-center space-x-3">
+                    <div className="text-3xl group-hover:scale-110 transition-transform">
+                      {bet.emoji}
+                    </div>
+                    <div className={`text-xs font-bold px-2 py-1 rounded-full ${
+                      bet.status === 'open' ? 'bg-green-100 text-green-800' :
+                      bet.status === 'closed' ? 'bg-orange-100 text-orange-800' :
+                      bet.status === 'settled' ? 'bg-blue-100 text-blue-800' :
+                      'bg-red-100 text-red-800'
+                    }`}>
+                      {bet.status.toUpperCase()}
+                    </div>
                   </div>
                   <div className="text-right">
                     <div className="flex items-center space-x-1 text-sm text-baseball-600">

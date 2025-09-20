@@ -32,7 +32,8 @@ def view_all_events():
             print(f"   Status: {event.status.value}")
             print(f"   Betting System: {event.betting_system_type.value}")
             print(f"   Event Start: {event.event_start_time}")
-            print(f"   Settlement Deadline: {event.settlement_deadline}")
+            print(f"   Event End: {event.event_end_time}")
+            print(f"   Settlement Time: {event.settlement_time}")
             
             # If it's a pari-mutuel event, show details
             if event.betting_system_type.value == "pari_mutuel":
