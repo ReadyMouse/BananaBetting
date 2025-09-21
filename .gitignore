@@ -179,6 +179,8 @@ $RECYCLE.BIN/
 # Database files
 *.sqlite3
 *.db
+seed_database.py
+SEED_DATABASE_README.md
 
 # API keys and secrets
 *.key
@@ -198,3 +200,4 @@ zchat/backend/venv/ # Virtual environment (already covered above but being expli
 
 # screenshots
 screenshots/*
+

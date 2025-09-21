@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from datetime import datetime
 
 class UserBase(BaseModel):
     email: str
@@ -234,12 +235,13 @@ class NonProfitBase(BaseModel):
     name: str
     website: str | None = None
     federal_tax_id: str
-    zcash_transparent_address: str | None = None
-    zcash_shielded_address: str | None = None
+    zcash_transparent_address: str
+    zcash_shielded_address: str
     contact_phone: str | None = None
     contact_name: str | None = None
     contact_email: str | None = None
     description: str | None = None
+    verification_notes: str | None = None
     
     class Config:
         from_attributes = True
@@ -247,7 +249,7 @@ class NonProfitBase(BaseModel):
 
 class NonProfitCreate(NonProfitBase):
     """Schema for creating a new nonprofit"""
-    pass
+    is_verified: bool = False
 
 
 class NonProfitUpdate(BaseModel):
@@ -272,8 +274,8 @@ class NonProfitUpdate(BaseModel):
 class NonProfitResponse(NonProfitBase):
     """Schema for nonprofit responses"""
     id: int
-    date_added: str
-    date_last_verified: str | None = None
+    date_added: datetime
+    date_last_verified: datetime | None = None
     is_verified: bool = False
     is_active: bool = True
     verification_notes: str | None = None

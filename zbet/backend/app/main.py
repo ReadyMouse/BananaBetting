@@ -193,7 +193,28 @@ def create_nonprofit(
 ):
     """Create a new nonprofit (admin only for now)"""
     # TODO: Add admin role check here when implemented
-    return crud.create_nonprofit(db, nonprofit)
+    try:
+        return crud.create_nonprofit(db, nonprofit)
+    except Exception as e:
+        # Handle unique constraint violations
+        if "UNIQUE constraint failed: nonprofits.federal_tax_id" in str(e):
+            raise HTTPException(
+                status_code=400, 
+                detail=f"A non-profit with EIN '{nonprofit.federal_tax_id}' already exists. Each organization can only be registered once."
+            )
+        elif "UNIQUE constraint failed: nonprofits.zcash_transparent_address" in str(e):
+            raise HTTPException(
+                status_code=400, 
+                detail=f"The Zcash transparent address '{nonprofit.zcash_transparent_address}' is already in use by another organization."
+            )
+        elif "UNIQUE constraint failed: nonprofits.zcash_shielded_address" in str(e):
+            raise HTTPException(
+                status_code=400, 
+                detail=f"The Zcash shielded address '{nonprofit.zcash_shielded_address}' is already in use by another organization."
+            )
+        else:
+            # Re-raise other exceptions
+            raise HTTPException(status_code=500, detail=f"Failed to create non-profit: {str(e)}")
 
 
 @app.put("/api/nonprofits/{nonprofit_id}", response_model=schemas.NonProfitResponse)

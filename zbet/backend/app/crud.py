@@ -357,6 +357,8 @@ def create_nonprofit(db: Session, nonprofit: schemas.NonProfitCreate):
         contact_name=nonprofit.contact_name,
         contact_email=nonprofit.contact_email,
         description=nonprofit.description,
+        verification_notes=nonprofit.verification_notes,
+        is_verified=nonprofit.is_verified,
         date_added=datetime.utcnow()
     )
     db.add(db_nonprofit)
