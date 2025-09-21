@@ -6,6 +6,38 @@ import json
 
 from .database import Base
 
+
+class NonProfit(Base):
+    __tablename__ = "nonprofits"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(255), nullable=False)
+    website = Column(String(500), nullable=True)
+    federal_tax_id = Column(String(20), nullable=False, unique=True, index=True)  # EIN or other tax ID
+    
+    # Zcash addresses
+    zcash_transparent_address = Column(String(100), nullable=True, unique=True, index=True)
+    zcash_shielded_address = Column(String(100), nullable=True, unique=True, index=True)
+    
+    # Contact information
+    contact_phone = Column(String(20), nullable=True)
+    contact_name = Column(String(255), nullable=True)
+    contact_email = Column(String(255), nullable=True)
+    
+    # Administrative fields
+    date_added = Column(DateTime, default=datetime.utcnow, nullable=False)
+    date_last_verified = Column(DateTime, nullable=True)
+    is_verified = Column(Boolean, default=False, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+    
+    # Optional description/notes
+    description = Column(Text, nullable=True)
+    verification_notes = Column(Text, nullable=True)
+    
+    # Relationships
+    sport_events = relationship("SportEvent", back_populates="nonprofit")
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -36,7 +68,7 @@ class EventStatus(enum.Enum):
 class BetOutcome(enum.Enum):
     WIN = "win"
     LOSS = "loss"
-    PUSH = "push" # neither win or lose, stalemate, tie, etc. 
+    PUSH = "push" # neither win or lose, stalemate, tie, etc. - triggers automatic refund 
 
 
 class DepositStatus(enum.Enum):
@@ -72,6 +104,7 @@ class SportEvent(Base):
     status = Column(Enum(EventStatus), default=EventStatus.OPEN, nullable=False)
     betting_system_type = Column(Enum(BettingSystemType), nullable=False)
     creator_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    nonprofit_id = Column(Integer, ForeignKey("nonprofits.id"), nullable=False) # Events must be for nonprofits
     
     # Event timing (all times stored in EST)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)  # Keep UTC for creation time
@@ -82,6 +115,7 @@ class SportEvent(Base):
     
     # Relationships
     creator = relationship("User")
+    nonprofit = relationship("NonProfit", back_populates="sport_events")
     
     def get_current_status(self):
         """Calculate the current status based on timing and stored status"""
@@ -119,7 +153,13 @@ class SportEvent(Base):
             "event_start_time": self.event_start_time.isoformat(),
             "event_end_time": self.event_end_time.isoformat(),
             "settlement_time": self.settlement_time.isoformat(),
-            "settled_at": self.settled_at.isoformat() if self.settled_at else None
+            "settled_at": self.settled_at.isoformat() if self.settled_at else None,
+            "nonprofit": {
+                "id": self.nonprofit.id,
+                "name": self.nonprofit.name,
+                "website": self.nonprofit.website,
+                "is_verified": self.nonprofit.is_verified
+            }
         }
         
         # Each betting system handles its own data

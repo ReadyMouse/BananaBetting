@@ -12,6 +12,12 @@ from . import models, schemas, serializers, crud
 from .zcash_mod import zcash_wallet
 from .config import settings
 
+def get_est_now():
+    """Get current time in EST timezone"""
+    from datetime import datetime, timezone, timedelta
+    est_timezone = timezone(timedelta(hours=-5))  # EST is UTC-5
+    return datetime.now(est_timezone).replace(tzinfo=None)
+
 
 def update_pari_mutuel_pool_stats(db: Session, bet: models.Bet, sport_event: models.SportEvent):
     """Update pari-mutuel pool statistics when a bet is placed"""
@@ -195,9 +201,7 @@ def settle_event(db: Session, event_id: int, winning_outcome: str, pool_address:
     # Mark event as settled
     sport_event.status = models.EventStatus.SETTLED
     # Set settlement time in EST
-    from datetime import timezone, timedelta
-    est_timezone = timezone(timedelta(hours=-5))
-    sport_event.settled_at = datetime.now(est_timezone).replace(tzinfo=None)
+    sport_event.settled_at = get_est_now()
     
     # Mark winning outcome in pari-mutuel event if applicable
     if sport_event.betting_system_type == models.BettingSystemType.PARI_MUTUEL:
@@ -225,6 +229,11 @@ def settle_event(db: Session, event_id: int, winning_outcome: str, pool_address:
 
 def _validate_winning_outcome(db: Session, sport_event: models.SportEvent, winning_outcome: str):
     """Validate that the winning outcome is valid for this event"""
+    
+    # Allow special outcomes that trigger refunds
+    if winning_outcome.lower() in ["push", "tie"]:
+        return  # These are always valid special outcomes
+    
     if sport_event.betting_system_type == models.BettingSystemType.PARI_MUTUEL:
         # Check if outcome exists in pari-mutuel pools
         pari_event = db.query(models.PariMutuelEvent).filter(
@@ -243,7 +252,7 @@ def _validate_winning_outcome(db: Session, sport_event: models.SportEvent, winni
             available_pools = db.query(models.PariMutuelPool).filter(
                 models.PariMutuelPool.pari_mutuel_event_id == pari_event.id
             ).all()
-            available_names = [p.outcome_name for p in available_pools]
+            available_names = [p.outcome_name for p in available_pools] + ["push", "tie"]
             raise HTTPException(
                 status_code=400, 
                 detail=f"Invalid winning outcome: '{winning_outcome}'. Available options: {available_names}"
@@ -258,7 +267,7 @@ def _validate_winning_outcome(db: Session, sport_event: models.SportEvent, winni
         if not existing_bet:
             raise HTTPException(
                 status_code=400, 
-                detail=f"No bets found for outcome: '{winning_outcome}'"
+                detail=f"No bets found for outcome: '{winning_outcome}'. Use 'push' or 'tie' for refund scenarios."
             )
 
 
@@ -300,7 +309,10 @@ def _process_event_payouts(db: Session, sport_event: models.SportEvent, winning_
     total_creator_fees = 0.0
     total_validator_fees = 0.0
     
-    if sport_event.betting_system_type == models.BettingSystemType.PARI_MUTUEL:
+    # No fees for PUSH/TIE outcomes - everyone just gets refunded
+    is_push_outcome = winning_outcome.lower() in ["push", "tie"]
+    
+    if not is_push_outcome and sport_event.betting_system_type == models.BettingSystemType.PARI_MUTUEL:
         pari_event = db.query(models.PariMutuelEvent).filter(
             models.PariMutuelEvent.sport_event_id == sport_event.id
         ).first()
@@ -324,7 +336,34 @@ def _process_event_payouts(db: Session, sport_event: models.SportEvent, winning_
     # Process all bets
     for bet in bets:
         # Determine bet outcome
-        if bet.predicted_outcome == winning_outcome:
+        if winning_outcome.lower() == "push" or winning_outcome.lower() == "tie":
+            # PUSH/TIE: Everyone gets their money back (refund)
+            bet.outcome = models.BetOutcome.PUSH
+            bet.payout_amount = bet.amount  # Full refund
+            
+            # Create payout record for refund
+            payout = models.Payout(
+                user_id=bet.user_id,
+                bet_id=bet.id,
+                sport_event_id=sport_event.id,
+                payout_amount=bet.amount,
+                recipient_address=bet.user.zcash_address,
+                payout_type="refund",
+                is_processed=False
+            )
+            db.add(payout)
+            
+            # Add to response records
+            payout_records.append(schemas.PayoutRecord(
+                user_id=bet.user_id,
+                bet_id=bet.id,
+                payout_amount=bet.amount,
+                payout_type="refund",
+                recipient_address=bet.user.zcash_address
+            ))
+            
+        elif bet.predicted_outcome == winning_outcome:
+            # Winning bet
             bet.outcome = models.BetOutcome.WIN
             
             # Calculate the settlement payout (fees already deducted for pari-mutuel)

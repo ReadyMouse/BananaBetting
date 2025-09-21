@@ -4,7 +4,7 @@ Simple script to create database tables from our models
 """
 
 from ..app.database import engine, Base
-from ..app.models import User, SportEvent, PariMutuelEvent, PariMutuelPool, Bet, Payout
+from ..app.models import User, SportEvent, PariMutuelEvent, PariMutuelPool, Bet, Payout, ValidationResult
 
 def create_tables():
     """Create all database tables"""

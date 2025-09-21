@@ -95,6 +95,7 @@ def create_sport_event(db: Session, event_data: schemas.SportEventCreate, creato
         category=models.EventCategory(event_data.category),
         betting_system_type=models.BettingSystemType(event_data.betting_system_type),
         creator_id=creator_id,
+        nonprofit_id=event_data.nonprofit_id,
         event_start_time=event_start_time,
         event_end_time=event_end_time,
         settlement_time=settlement_time,
@@ -139,6 +140,23 @@ def create_pari_mutuel_event(db: Session, sport_event_id: int, pari_mutuel_data:
 def get_user_bets(db: Session, user_id: int, skip: int = 0, limit: int = 100):
     """Get all bets for a specific user"""
     return db.query(models.Bet).filter(models.Bet.user_id == user_id).offset(skip).limit(limit).all()
+
+
+def get_user_bets_for_event(db: Session, user_id: int, sport_event_id: int):
+    """Get all bets for a specific user on a specific event"""
+    return db.query(models.Bet).filter(
+        models.Bet.user_id == user_id,
+        models.Bet.sport_event_id == sport_event_id
+    ).all()
+
+
+def has_user_bet_on_event(db: Session, user_id: int, sport_event_id: int) -> bool:
+    """Check if a user has placed any bet on a specific event"""
+    bet = db.query(models.Bet).filter(
+        models.Bet.user_id == user_id,
+        models.Bet.sport_event_id == sport_event_id
+    ).first()
+    return bet is not None
 
 
 def create_bet(db: Session, bet_data: schemas.BetPlacementRequest, user_id: int):
@@ -302,5 +320,68 @@ def mark_correct_validations_and_calculate_rewards(db: Session, sport_event_id: 
     db.commit()
     
     return len(correct_validations)
+
+
+# NonProfit CRUD functions
+def get_nonprofit(db: Session, nonprofit_id: int):
+    """Get a single nonprofit by ID"""
+    return db.query(models.NonProfit).filter(models.NonProfit.id == nonprofit_id).first()
+
+
+def get_nonprofits(db: Session, skip: int = 0, limit: int = 100, active_only: bool = True, search: str = None):
+    """Get nonprofits with optional filtering"""
+    query = db.query(models.NonProfit)
+    
+    if active_only:
+        query = query.filter(models.NonProfit.is_active == True)
+    
+    if search:
+        search_pattern = f"%{search}%"
+        query = query.filter(
+            models.NonProfit.name.ilike(search_pattern) |
+            models.NonProfit.description.ilike(search_pattern)
+        )
+    
+    return query.offset(skip).limit(limit).all()
+
+
+def create_nonprofit(db: Session, nonprofit: schemas.NonProfitCreate):
+    """Create a new nonprofit"""
+    db_nonprofit = models.NonProfit(
+        name=nonprofit.name,
+        website=nonprofit.website,
+        federal_tax_id=nonprofit.federal_tax_id,
+        zcash_transparent_address=nonprofit.zcash_transparent_address,
+        zcash_shielded_address=nonprofit.zcash_shielded_address,
+        contact_phone=nonprofit.contact_phone,
+        contact_name=nonprofit.contact_name,
+        contact_email=nonprofit.contact_email,
+        description=nonprofit.description,
+        date_added=datetime.utcnow()
+    )
+    db.add(db_nonprofit)
+    db.commit()
+    db.refresh(db_nonprofit)
+    return db_nonprofit
+
+
+def update_nonprofit(db: Session, nonprofit_id: int, nonprofit_update: schemas.NonProfitUpdate):
+    """Update nonprofit information"""
+    db_nonprofit = get_nonprofit(db, nonprofit_id)
+    if not db_nonprofit:
+        return None
+    
+    update_data = nonprofit_update.dict(exclude_unset=True)
+    
+    # Update date_last_verified if verification status is being changed
+    if 'is_verified' in update_data and update_data['is_verified'] != db_nonprofit.is_verified:
+        update_data['date_last_verified'] = datetime.utcnow()
+    
+    for field, value in update_data.items():
+        setattr(db_nonprofit, field, value)
+    
+    db.commit()
+    db.refresh(db_nonprofit)
+    return db_nonprofit
 
 

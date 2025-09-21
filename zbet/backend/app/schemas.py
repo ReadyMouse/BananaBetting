@@ -35,6 +35,18 @@ class Transaction(BaseModel):
     amount: float
 
 
+# NonProfit summary schema (defined early since it's used in SportEventResponse)
+class NonProfitSummary(BaseModel):
+    """Minimal nonprofit info for event responses"""
+    id: int
+    name: str
+    website: str | None = None
+    is_verified: bool = False
+    
+    class Config:
+        from_attributes = True
+
+
 # Betting schemas
 class PariMutuelPoolResponse(BaseModel):
     id: int
@@ -77,6 +89,7 @@ class SportEventResponse(BaseModel):
     settlement_time: str  # Renamed from settlement_deadline for clarity
     settled_at: str | None = None
     betting_system_data: dict | None = None  # Generic field for any betting system data
+    nonprofit: NonProfitSummary  # Minimal nonprofit info (required)
 
     class Config:
         from_attributes = True
@@ -91,6 +104,7 @@ class SportEventCreate(BaseModel):
     event_start_time: str
     event_end_time: str
     settlement_time: str  # Renamed from settlement_deadline for clarity
+    nonprofit_id: int 
 
 
 class PariMutuelPoolCreate(BaseModel):
@@ -210,6 +224,59 @@ class ValidationSummary(BaseModel):
     consensus_outcome: str | None = None
     consensus_percentage: float | None = None
     validation_deadline: str | None = None
+    
+    class Config:
+        from_attributes = True
+
+
+# NonProfit schemas
+class NonProfitBase(BaseModel):
+    name: str
+    website: str | None = None
+    federal_tax_id: str
+    zcash_transparent_address: str | None = None
+    zcash_shielded_address: str | None = None
+    contact_phone: str | None = None
+    contact_name: str | None = None
+    contact_email: str | None = None
+    description: str | None = None
+    
+    class Config:
+        from_attributes = True
+
+
+class NonProfitCreate(NonProfitBase):
+    """Schema for creating a new nonprofit"""
+    pass
+
+
+class NonProfitUpdate(BaseModel):
+    """Schema for updating nonprofit information"""
+    name: str | None = None
+    website: str | None = None
+    federal_tax_id: str | None = None
+    zcash_transparent_address: str | None = None
+    zcash_shielded_address: str | None = None
+    contact_phone: str | None = None
+    contact_name: str | None = None
+    contact_email: str | None = None
+    description: str | None = None
+    is_verified: bool | None = None
+    is_active: bool | None = None
+    verification_notes: str | None = None
+    
+    class Config:
+        from_attributes = True
+
+
+class NonProfitResponse(NonProfitBase):
+    """Schema for nonprofit responses"""
+    id: int
+    date_added: str
+    date_last_verified: str | None = None
+    is_verified: bool = False
+    is_active: bool = True
+    verification_notes: str | None = None
     
     class Config:
         from_attributes = True

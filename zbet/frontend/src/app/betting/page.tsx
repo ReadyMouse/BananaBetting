@@ -6,7 +6,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Filter, TrendingUp, Clock, DollarSign, Zap } from 'lucide-react';
 import { cn, getRandomBananaEmoji } from '@/lib/utils';
 import api from '@/lib/api';
-import Disclaimer from '@/components/Disclaimer';
 
 // API Configuration
 const API_BASE_URL = 'http://localhost:8000';
@@ -611,7 +610,6 @@ export default function BettingPage() {
           <p className="text-baseball-600 italic mb-4">
             Remember: Bet responsibly and have fun! 🎪⚾🍌
           </p>
-          <Disclaimer />
         </motion.div>
       </div>
     </div>

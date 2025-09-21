@@ -18,7 +18,6 @@ import {
 import { cn, getRandomBananaEmoji } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { tokenManager } from '@/lib/api';
-import Disclaimer from '@/components/Disclaimer';
 
 // API Configuration
 const API_BASE_URL = 'http://localhost:8000';
@@ -145,6 +144,14 @@ export default function SettleBetsPage() {
         description: `${pool.bet_count} bets, ${pool.pool_amount.toFixed(4)} ZEC`,
         color: index === 0 ? 'text-grass-600' : index === 1 ? 'text-banana-600' : 'text-purple-600'
       })) || [];
+      
+      // Add Push/Tie option for refunds
+      possibleOutcomes.push({
+        id: 'push',
+        label: 'Push / Tie',
+        description: 'Event ended in a tie or should be refunded to all bettors',
+        color: 'text-gray-600'
+      });
     }
 
     // Add default outcomes if none exist
@@ -152,6 +159,7 @@ export default function SettleBetsPage() {
       possibleOutcomes = [
         { id: 'yes', label: 'Yes / Happened', description: 'The event occurred as described', color: 'text-grass-600' },
         { id: 'no', label: 'No / Did not happen', description: 'The event did not occur', color: 'text-red-600' },
+        { id: 'push', label: 'Push / Tie', description: 'Event ended in a tie or should be refunded to all bettors', color: 'text-gray-600' },
         { id: 'unclear', label: 'Unclear / Disputed', description: 'The outcome is unclear or disputed', color: 'text-yellow-600' }
       ];
     }
@@ -218,30 +226,32 @@ export default function SettleBetsPage() {
         return;
       }
 
-      // Submit validation to API
-      const response = await fetch(`${API_BASE_URL}/api/events/${eventId}/validate`, {
+      // Submit settlement to API
+      const response = await fetch(`${API_BASE_URL}/api/events/${eventId}/settle`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          predicted_outcome: selectedOutcome,
-          confidence_level: 'high'  // Default to high confidence
+          winning_outcome: selectedOutcome
         })
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || `HTTP ${response.status}: Failed to submit validation`);
+        throw new Error(errorData.detail || `HTTP ${response.status}: Failed to settle event`);
       }
 
-      const validationResult = await response.json();
+      const settlementResult = await response.json();
       
-      // Success message
-      alert(`Thank you for validating! Your vote for "${selectedOutcome}" has been recorded and will contribute to the consensus mechanism.`);
+      // Success message with settlement details
+      alert(`Event settled successfully! Winner: "${selectedOutcome}". 
+             Total payouts: ${settlementResult.total_payouts} 
+             Total amount: ${settlementResult.total_payout_amount} ZEC
+             Transaction ID: ${settlementResult.transaction_id || 'None (no payouts)'}`);
       
-      // Remove from local state since user has now validated this event
+      // Remove from local state since event is now settled
       setSettlableEvents(prev => prev.filter(event => event.id !== eventId));
       
       // Clear the selected outcome for this event
@@ -252,8 +262,62 @@ export default function SettleBetsPage() {
       });
       
     } catch (err) {
-      console.error('Failed to submit validation:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Failed to submit validation. Please try again.';
+      console.error('Failed to settle event:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to settle event. Please try again.';
+      alert(errorMessage);
+    }
+  };
+
+  const handleAutoSettlement = async (eventId: number) => {
+    try {
+      // Get authentication token
+      const token = tokenManager.getToken();
+      if (!token) {
+        alert('Authentication required. Please log in again.');
+        return;
+      }
+
+      // Submit auto settlement to API
+      const response = await fetch(`${API_BASE_URL}/api/events/${eventId}/auto-settle`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `HTTP ${response.status}: Failed to auto-settle`);
+      }
+
+      const settlementResult = await response.json();
+      
+      // Success message with settlement details
+      let message = '';
+      if (settlementResult.settlement_type === 'consensus') {
+        message = `Event auto-settled with consensus (${settlementResult.consensus_percentage?.toFixed(1)}%)! 
+                   Winner: "${settlementResult.winning_outcome}". 
+                   Total payouts: ${settlementResult.total_payouts} 
+                   Total amount: ${settlementResult.total_payout_amount} ZEC`;
+      } else if (settlementResult.settlement_type === 'deadline_refund') {
+        message = `Event auto-settled with refunds (deadline passed). 
+                   All bets refunded: ${settlementResult.total_payouts} participants
+                   Total refund amount: ${settlementResult.total_payout_amount} ZEC`;
+      } else {
+        message = `Event auto-settled! Winner: "${settlementResult.winning_outcome}". 
+                   Total payouts: ${settlementResult.total_payouts}
+                   Total amount: ${settlementResult.total_payout_amount} ZEC`;
+      }
+      
+      alert(message + `\nTransaction ID: ${settlementResult.transaction_id || 'None (no payouts)'}`);
+      
+      // Remove from local state since event is now settled
+      setSettlableEvents(prev => prev.filter(event => event.id !== eventId));
+      
+    } catch (err) {
+      console.error('Failed to auto-settle event:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to auto-settle. Please try again.';
       alert(errorMessage);
     }
   };
@@ -352,12 +416,12 @@ export default function SettleBetsPage() {
             </motion.span>
           </div>
           <p className="text-lg text-baseball-600 italic mb-4">
-            Help validate bet outcomes and earn rewards! 🎪
+            Finalize event outcomes and distribute payouts! ⚡
           </p>
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-4xl mx-auto">
             <p className="text-blue-800 text-sm">
-              <strong>How it works:</strong> Help validate the outcomes of completed events. Your votes contribute to the consensus mechanism. 
-              Future features will include reputation systems and rewards for accurate validators!
+              <strong>How it works:</strong> Events can be settled manually with a specific outcome, or auto-settled using validator consensus. 
+              If past deadline with no consensus, all bets are automatically refunded. Payouts distributed via Zcash transactions.
             </p>
           </div>
         </motion.div>
@@ -501,27 +565,47 @@ export default function SettleBetsPage() {
                   </div>
                 </div>
 
-                {/* Submit Button */}
-                <div className="flex items-center justify-between">
+                {/* Settlement Actions */}
+                <div className="space-y-4">
                   <div className="text-sm text-baseball-600">
                     <AlertTriangle size={16} className="inline mr-1" />
-                    Your validation will be recorded and contribute to the final settlement
+                    Choose how to settle this event
                   </div>
                   
-                  <motion.button
-                    onClick={() => handleSubmitSettlement(event.id)}
-                    disabled={!selectedOutcomes[event.id]}
-                    whileHover={{ scale: selectedOutcomes[event.id] ? 1.05 : 1 }}
-                    whileTap={{ scale: selectedOutcomes[event.id] ? 0.95 : 1 }}
-                    className={cn(
-                      'px-6 py-2 rounded-lg font-medium transition-all duration-200',
-                      selectedOutcomes[event.id]
-                        ? 'bg-grass-500 hover:bg-grass-600 text-white'
-                        : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                    )}
-                  >
-                    Submit Validation
-                  </motion.button>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    {/* Manual Settlement */}
+                    <motion.button
+                      onClick={() => handleSubmitSettlement(event.id)}
+                      disabled={!selectedOutcomes[event.id]}
+                      whileHover={{ scale: selectedOutcomes[event.id] ? 1.05 : 1 }}
+                      whileTap={{ scale: selectedOutcomes[event.id] ? 0.95 : 1 }}
+                      className={cn(
+                        'flex-1 px-6 py-3 rounded-lg font-medium transition-all duration-200 flex items-center justify-center space-x-2',
+                        selectedOutcomes[event.id]
+                          ? 'bg-grass-500 hover:bg-grass-600 text-white shadow-lg'
+                          : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                      )}
+                    >
+                      <Trophy size={20} />
+                      <span>Settle with Selected Outcome</span>
+                    </motion.button>
+
+                    {/* Auto Settlement */}
+                    <motion.button
+                      onClick={() => handleAutoSettlement(event.id)}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="flex-1 px-6 py-3 rounded-lg font-medium transition-all duration-200 flex items-center justify-center space-x-2 bg-banana-500 hover:bg-banana-600 text-white shadow-lg"
+                    >
+                      <Users size={20} />
+                      <span>Auto-Settle Event</span>
+                    </motion.button>
+                  </div>
+                  
+                  <div className="text-xs text-baseball-500 space-y-1">
+                    <p><strong>Manual:</strong> Immediately settle with your selected outcome</p>
+                    <p><strong>Auto-Settle:</strong> Automatically use consensus if available, or refund if past deadline</p>
+                  </div>
                 </div>
               </motion.div>
             ))}
@@ -559,7 +643,6 @@ export default function SettleBetsPage() {
           <p className="text-baseball-600 italic mb-4">
             Help maintain the integrity of Banana Betting! 🎪⚖️🍌
           </p>
-          <Disclaimer />
         </motion.div>
       </div>
     </div>

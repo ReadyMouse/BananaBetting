@@ -3,10 +3,9 @@
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { motion } from 'framer-motion';
-import { TrendingUp, Search, Users, Trophy, Zap, Star, Calendar } from 'lucide-react';
+import { TrendingUp, Search, Users, Trophy, Zap, Star, Calendar, Heart, HandHeart, HelpCircle, Target, Globe, Shield } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { getRandomBananaEmoji } from '@/lib/utils';
-import Disclaimer from '@/components/Disclaimer';
 import { bettingApi, Statistics } from '@/lib/api';
 
 // API Configuration
@@ -185,24 +184,24 @@ export default function Home() {
 
 
   const stats = statsLoading ? [
-    { label: "Total Bets", value: "...", icon: TrendingUp },
-    { label: "Betting Events", value: "...", icon: Calendar },
-    { label: "Fun Level", value: "MAX", icon: Zap },
+    { label: "Lives Impacted", value: "...", icon: Heart },
+    { label: "Charity Raised", value: "...", icon: HandHeart },
+    { label: "Social Impact", value: "HIGH", icon: Globe },
   ] : [
     { 
-      label: "Total Bets", 
+      label: "Lives Impacted", 
       value: statistics?.total_bets?.toString() || "0", 
-      icon: TrendingUp 
+      icon: Heart 
     },
     { 
-      label: "Betting Events", 
-      value: statistics?.total_events?.toString() || "0", 
-      icon: Calendar 
+      label: "Charity Raised", 
+      value: `${((statistics?.total_bets || 0) * 0.6).toFixed(2)} ZEC`, 
+      icon: HandHeart 
     },
     { 
-      label: "Fun Level", 
-      value: "MAX", 
-      icon: Zap 
+      label: "Social Impact", 
+      value: "HIGH", 
+      icon: Globe 
     },
   ];
 
@@ -234,8 +233,11 @@ export default function Home() {
               ⚾
             </motion.span>
           </div>
-          <p className="text-xl text-baseball-600 italic mb-8">
-            Ready for some banana-crazy betting action? 🎪
+          <p className="text-xl text-baseball-600 italic mb-4">
+            Betting for Social Good - Creating Opportunities & Supporting Charities 🌟
+          </p>
+          <p className="text-lg text-baseball-500 mb-8">
+            Every bet creates employment for disabled individuals and funds charitable causes
           </p>
 
           {/* Quick Stats */}
@@ -350,7 +352,7 @@ export default function Home() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.6 }}
-          className="grid grid-cols-1 md:grid-cols-2 gap-6"
+          className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-16"
         >
           <motion.button
             onClick={() => router.push('/betting')}
@@ -375,17 +377,199 @@ export default function Home() {
           </motion.button>
         </motion.div>
 
-        {/* Fun Footer */}
+        {/* How It Works Section */}
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.7 }}
+          className="mb-16"
+        >
+          <div className="text-center mb-8">
+            <div className="flex items-center justify-center space-x-3 mb-4">
+              <Target className="text-banana-600" size={32} />
+              <h2 className="font-baseball text-3xl font-bold text-banana-800">
+                How It Works
+              </h2>
+              <Target className="text-banana-600" size={32} />
+            </div>
+            <p className="text-lg text-baseball-600 max-w-3xl mx-auto">
+              We've reimagined prediction markets as a force for social good
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.8 }}
+              className="bg-white/90 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-banana-200 text-center"
+            >
+              <div className="text-5xl mb-4">🎯</div>
+              <h3 className="font-bold text-xl text-banana-800 mb-3">Place Your Bet</h3>
+              <p className="text-baseball-600">
+                Bet on crowd-sourced, viral-worthy events like "Will the Savannah Bananas dance to K-pop during their game?"
+              </p>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.9 }}
+              className="bg-white/90 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-banana-200 text-center"
+            >
+              <div className="text-5xl mb-4">❤️</div>
+              <h3 className="font-bold text-xl text-banana-800 mb-3">Support Causes</h3>
+              <p className="text-baseball-600">
+                50-70% of losing bets go to charity, 15-25% creates remote employment for disabled individuals, 10-15% supports content creators
+              </p>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 1.0 }}
+              className="bg-white/90 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-banana-200 text-center"
+            >
+              <div className="text-5xl mb-4">🏆</div>
+              <h3 className="font-bold text-xl text-banana-800 mb-3">Everyone Wins</h3>
+              <p className="text-baseball-600">
+                Winners keep their earnings, while every bet creates positive social impact through our decentralized validation system
+              </p>
+            </motion.div>
+          </div>
+        </motion.section>
+
+        {/* The Vision Section */}
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 1.1 }}
+          className="mb-16"
+        >
+          <div className="bg-gradient-to-r from-banana-100 to-grass-100 rounded-2xl p-8 shadow-lg border border-banana-200">
+            <div className="text-center mb-6">
+              <div className="flex items-center justify-center space-x-3 mb-4">
+                <Globe className="text-banana-600" size={32} />
+                <h2 className="font-baseball text-3xl font-bold text-banana-800">
+                  Our Vision
+                </h2>
+                <Globe className="text-banana-600" size={32} />
+              </div>
+            </div>
+            
+            <div className="max-w-4xl mx-auto">
+              <h3 className="text-2xl font-bold text-banana-800 mb-4 text-center">
+                Inclusive Prediction Markets: A Social Impact Platform
+              </h3>
+              <p className="text-baseball-700 leading-relaxed text-lg">
+                Our platform reimagines prediction markets as a force for social good by creating remote employment 
+                opportunities for disabled individuals while raising funds for charity. Users place bets on crowd-sourced, 
+                viral-worthy events (like "Will the Savannah Bananas dance to K-pop during their game?"), but instead of 
+                a traditional house edge, losing bets are distributed to charity (50-70%), remote validators with disabilities 
+                who verify outcomes (15-25%), and content creators who generate engaging betting topics (10-15%). 
+              </p>
+              <br />
+              <p className="text-baseball-700 leading-relaxed text-lg">
+                Winners keep their winnings, while the platform takes a small processing fee similar to GoFundMe. 
+                Built on Zcash for privacy protection, the system leverages decentralized validation to ensure fair 
+                outcomes while creating meaningful economic opportunities for wheelchair-bound, bedbound, and other 
+                remote-capable disabled individuals. Charities themselves can create viral betting content, transforming 
+                from passive recipients to active fundraising participants. Banana Betting opens doors to support social 
+                enterprises while creating a sustainable ecosystem where entertainment, social impact, and economic inclusion intersect.
+              </p>
+            </div>
+          </div>
+        </motion.section>
+
+        {/* FAQ Section */}
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 1.2 }}
+          className="mb-16"
+        >
+          <div className="text-center mb-8">
+            <div className="flex items-center justify-center space-x-3 mb-4">
+              <HelpCircle className="text-banana-600" size={32} />
+              <h2 className="font-baseball text-3xl font-bold text-banana-800">
+                Frequently Asked Questions
+              </h2>
+              <HelpCircle className="text-banana-600" size={32} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 1.3 }}
+              className="bg-white/90 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-banana-200"
+            >
+              <h3 className="font-bold text-lg text-banana-800 mb-3">How does the social impact work?</h3>
+              <p className="text-baseball-600">
+                Every losing bet is automatically distributed: 50-70% to verified charities, 15-25% to disabled 
+                remote validators who verify event outcomes, and 10-15% to content creators who generate engaging betting topics.
+              </p>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 1.4 }}
+              className="bg-white/90 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-banana-200"
+            >
+              <h3 className="font-bold text-lg text-banana-800 mb-3">What happens to my winnings?</h3>
+              <p className="text-baseball-600">
+                Winners keep 100% of their winnings! Only losing bets contribute to the social impact pool. 
+                We take a small processing fee (like GoFundMe) only from the social impact distribution.
+              </p>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 1.5 }}
+              className="bg-white/90 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-banana-200"
+            >
+              <h3 className="font-bold text-lg text-banana-800 mb-3">Why use Zcash?</h3>
+              <p className="text-baseball-600">
+                Zcash provides privacy protection for our users while maintaining transparency for charitable distributions. 
+                This ensures fair play while protecting user privacy in the betting process.
+              </p>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 1.6 }}
+              className="bg-white/90 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-banana-200"
+            >
+              <h3 className="font-bold text-lg text-banana-800 mb-3">How are outcomes verified?</h3>
+              <p className="text-baseball-600">
+                Our decentralized validation system employs remote workers, many with disabilities, who verify event outcomes. 
+                This creates meaningful employment opportunities while ensuring fair and accurate bet resolution.
+              </p>
+            </motion.div>
+          </div>
+        </motion.section>
+
+        {/* Social Impact Footer */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.8 }}
+          transition={{ delay: 1.7 }}
           className="text-center mt-12 p-6 bg-white/50 backdrop-blur-sm rounded-2xl border border-banana-200"
         >
-          <p className="text-baseball-600 italic mb-4">
-            "Banana-ball is 90% fun, 10% skill, and 100% bananas!"
+          <div className="flex items-center justify-center space-x-2 mb-4">
+            <Shield className="text-banana-600" size={20} />
+            <p className="text-baseball-600 italic">
+              "Every bet creates opportunities, supports charities, and builds a more inclusive world."
+            </p>
+            <Shield className="text-banana-600" size={20} />
+          </div>
+          <p className="text-sm text-baseball-500 mb-4">
+            Built on Zcash for privacy • Validated by our community • Powered by social good
           </p>
-          <Disclaimer />
         </motion.div>
       </div>
     </div>

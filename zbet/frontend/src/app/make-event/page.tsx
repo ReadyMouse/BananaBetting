@@ -17,6 +17,7 @@ import {
 import { cn, getRandomBananaEmoji } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { tokenManager } from '@/lib/api';
+import NonProfitDropdown from '@/components/NonProfitDropdown';
 
 // API Configuration
 const API_BASE_URL = 'http://localhost:8000';
@@ -67,6 +68,7 @@ interface FormData {
   event_start_time: string;
   event_end_time: string;
   settlement_time: string;
+  nonprofit_id: number | null;
   // Pari-mutuel specific fields
   betting_pools: PariMutuelPool[];
 }
@@ -87,6 +89,7 @@ export default function MakeEventPage() {
     event_start_time: '',
     event_end_time: '',
     settlement_time: '',
+    nonprofit_id: null,
     betting_pools: [
       { outcome_name: 'option_a', outcome_description: 'Option A' },
       { outcome_name: 'option_b', outcome_description: 'Option B' }
@@ -186,6 +189,7 @@ export default function MakeEventPage() {
   const validateForm = (): string | null => {
     if (!formData.title.trim()) return 'Title is required';
     if (!formData.description.trim()) return 'Description is required';
+    if (!formData.nonprofit_id) return 'Please select a nonprofit organization';
     if (!formData.event_start_time) return 'Event start time is required';
     if (!formData.event_end_time) return 'Event end time is required';
     if (!formData.settlement_time) return 'Settlement time is required';
@@ -239,7 +243,8 @@ export default function MakeEventPage() {
         betting_system_type: formData.betting_system_type,
         event_start_time: formData.event_start_time + ':00', // Add seconds for complete ISO format
         event_end_time: formData.event_end_time + ':00',
-        settlement_time: formData.settlement_time + ':00'
+        settlement_time: formData.settlement_time + ':00',
+        nonprofit_id: formData.nonprofit_id
       };
       
       // Pari-mutuel specific data
@@ -424,6 +429,20 @@ export default function MakeEventPage() {
                   rows={4}
                   className="w-full px-4 py-3 border border-banana-300 rounded-lg focus:ring-2 focus:ring-banana-500 focus:border-banana-500 transition-colors text-gray-900"
                 />
+              </div>
+
+              {/* Nonprofit Selection */}
+              <div className="md:col-span-2">
+                <NonProfitDropdown
+                  selectedNonProfitId={formData.nonprofit_id}
+                  onSelect={(nonprofitId) => handleInputChange('nonprofit_id', nonprofitId)}
+                  apiBaseUrl={API_BASE_URL}
+                  required={true}
+                  placeholder="Search and select a nonprofit to support..."
+                />
+                <p className="text-sm text-baseball-600 mt-1">
+                  💝 All events must support a nonprofit organization. Betting proceeds will help fund their mission!
+                </p>
               </div>
 
               {/* Category */}

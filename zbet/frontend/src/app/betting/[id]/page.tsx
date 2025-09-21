@@ -8,6 +8,7 @@ import { cn, getRandomBananaEmoji } from '@/lib/utils';
 import { bettingApi } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import Disclaimer from '@/components/Disclaimer';
+import ValidationStatusCard from '@/components/ValidationStatusCard';
 
 // API Configuration
 const API_BASE_URL = 'http://localhost:8000';
@@ -608,6 +609,20 @@ export default function IndividualBettingPage() {
             </div>
           </motion.div>
         </div>
+
+        {/* Validation Status Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6 }}
+          className="mt-8"
+        >
+          <ValidationStatusCard 
+            eventId={betId}
+            eventStatus={bet.status}
+            isAuthenticated={isAuthenticated}
+          />
+        </motion.div>
 
         {/* Fun Footer */}
         <motion.div
