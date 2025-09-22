@@ -36,7 +36,7 @@ export interface Bet {
   minimumBet: number;
   maximumBet: number;
   category: "baseball" | "banana-antics" | "crowd-fun" | "player-props";
-  status: "open" | "closed" | "settled";
+  status: "open" | "closed" | "settled" | "paidout";
   outcome?: "win" | "loss" | "push";
   createdAt: string;
   settlementDate?: string;

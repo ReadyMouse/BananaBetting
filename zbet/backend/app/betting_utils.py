@@ -120,8 +120,9 @@ def settle_event_with_consensus(db: Session, event_id: int, pool_address: str = 
     
     # Check if event can be settled
     current_status = sport_event.get_current_status()
-    if current_status == models.EventStatus.SETTLED:
-        raise HTTPException(status_code=400, detail="Event is already settled")
+    if current_status in [models.EventStatus.SETTLED, models.EventStatus.PAIDOUT]:
+        status_text = "paid out" if current_status == models.EventStatus.PAIDOUT else "settled"
+        raise HTTPException(status_code=400, detail=f"Event is already {status_text}")
     
     if current_status not in [models.EventStatus.CLOSED]:
         raise HTTPException(status_code=400, detail="Event must be closed for consensus settlement")
@@ -170,8 +171,9 @@ def settle_event(db: Session, event_id: int, winning_outcome: str, pool_address:
     
     # Check if event can be settled
     current_status = sport_event.get_current_status()
-    if current_status == models.EventStatus.SETTLED:
-        raise HTTPException(status_code=400, detail="Event is already settled")
+    if current_status in [models.EventStatus.SETTLED, models.EventStatus.PAIDOUT]:
+        status_text = "paid out" if current_status == models.EventStatus.PAIDOUT else "settled"
+        raise HTTPException(status_code=400, detail=f"Event is already {status_text}")
     
     if current_status not in [models.EventStatus.OPEN, models.EventStatus.CLOSED]:
         raise HTTPException(status_code=400, detail="Event is not open for settlement")
@@ -225,6 +227,45 @@ def settle_event(db: Session, event_id: int, winning_outcome: str, pool_address:
         settled_at=sport_event.settled_at.isoformat() + 'Z',
         payout_records=payout_records
     )
+
+
+def mark_event_paid_out(db: Session, event_id: int) -> bool:
+    """
+    Mark an event as paid out after all payments have been processed.
+    
+    Args:
+        db: Database session
+        event_id: ID of the event to mark as paid out
+        
+    Returns:
+        bool: True if successfully marked as paid out, False otherwise
+    """
+    # Get the event
+    sport_event = db.query(models.SportEvent).filter(models.SportEvent.id == event_id).first()
+    if not sport_event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    
+    # Check if event is settled
+    if sport_event.status != models.EventStatus.SETTLED:
+        raise HTTPException(status_code=400, detail="Event must be settled before marking as paid out")
+    
+    # Verify all payouts have been processed
+    unprocessed_payouts = db.query(models.Payout).filter(
+        models.Payout.sport_event_id == event_id,
+        models.Payout.is_processed == False
+    ).count()
+    
+    if unprocessed_payouts > 0:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Cannot mark as paid out: {unprocessed_payouts} payouts are still unprocessed"
+        )
+    
+    # Mark event as paid out
+    sport_event.status = models.EventStatus.PAIDOUT
+    db.commit()
+    
+    return True
 
 
 def _validate_winning_outcome(db: Session, sport_event: models.SportEvent, winning_outcome: str):

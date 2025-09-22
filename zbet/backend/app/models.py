@@ -62,6 +62,7 @@ class EventStatus(enum.Enum):
     OPEN = "open"
     CLOSED = "closed" 
     SETTLED = "settled"
+    PAIDOUT = "paidout"
     CANCELLED = "cancelled"
 
 
@@ -119,8 +120,8 @@ class SportEvent(Base):
     
     def get_current_status(self):
         """Calculate the current status based on timing and stored status"""
-        # If event is already settled or cancelled, return as is
-        if self.status in [EventStatus.SETTLED, EventStatus.CANCELLED]:
+        # If event is already settled, paid out, or cancelled, return as is
+        if self.status in [EventStatus.SETTLED, EventStatus.PAIDOUT, EventStatus.CANCELLED]:
             return self.status
         
         from datetime import datetime, timezone, timedelta

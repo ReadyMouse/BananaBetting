@@ -49,20 +49,21 @@ def check_validation_events():
             is_past = "[PAST]" in event.title
             is_closed = event.status == EventStatus.CLOSED
             is_settled = event.status == EventStatus.SETTLED
+            is_paidout = event.status == EventStatus.PAIDOUT
             
             if is_past:
                 past_events.append(event)
-                if not has_bet and is_closed and not is_settled:
+                if not has_bet and is_closed and not is_settled and not is_paidout:
                     validation_events.append(event)
             else:
                 future_events.append(event)
             
-            status_icon = "⚖️" if is_settled else ("🔒" if is_closed else "🟢")
+            status_icon = "💰" if is_paidout else ("⚖️" if is_settled else ("🔒" if is_closed else "🟢"))
             bet_icon = "💰" if has_bet else "🚫"
             
             print(f"{status_icon} {bet_icon} {event.title[:60]}...")
             print(f"    Status: {event.status.value}, Test user bet: {'Yes' if has_bet else 'No'}")
-            if is_past and not has_bet and is_closed and not is_settled:
+            if is_past and not has_bet and is_closed and not is_settled and not is_paidout:
                 print(f"    ✨ AVAILABLE FOR VALIDATION")
             print()
         
@@ -88,3 +89,4 @@ def check_validation_events():
 
 if __name__ == "__main__":
     check_validation_events()
+

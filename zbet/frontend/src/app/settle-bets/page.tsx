@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { cn, getRandomBananaEmoji } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
+import { tokenManager } from '@/lib/api';
 import Disclaimer from '@/components/Disclaimer';
 
 // API Configuration
@@ -81,6 +82,13 @@ export default function SettleBetsPage() {
       setLoading(true);
       setError(null);
       
+      // Get the authentication token
+      const token = tokenManager.getToken();
+      if (!token) {
+        setError('Please log in to view settlable events');
+        return;
+      }
+      
       // Fetch all events
       const response = await fetch(`${API_BASE_URL}/api/events`);
       
@@ -103,8 +111,30 @@ export default function SettleBetsPage() {
                event.status !== 'cancelled';
       });
       
+      // Check which events the user has already validated
+      const userStatusPromises = eligibleEvents.map((event: any) =>
+        fetch(`${API_BASE_URL}/api/events/${event.id}/user-status`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }).then(response => {
+          if (response.ok) {
+            return response.json();
+          }
+          return { event_id: event.id, has_validated: false };
+        }).catch(() => ({ event_id: event.id, has_validated: false }))
+      );
+      
+      const userStatuses = await Promise.all(userStatusPromises);
+      
+      // Filter out events the user has already validated
+      const unvalidatedEvents = eligibleEvents.filter((event: any) => {
+        const userStatus = userStatuses.find(status => status.event_id === event.id);
+        return !userStatus?.has_validated;
+      });
+      
       // Transform events for settlement view
-      const transformedEvents = eligibleEvents.map(transformEventForSettlement);
+      const transformedEvents = unvalidatedEvents.map(transformEventForSettlement);
       setSettlableEvents(transformedEvents);
       
     } catch (err) {
@@ -210,16 +240,41 @@ export default function SettleBetsPage() {
     }
 
     try {
-      // This would submit the settlement validation
-      // For now, just show a success message
-      alert(`Thank you for validating! Your settlement vote for "${selectedOutcome}" has been recorded. In the future, this will contribute to the consensus mechanism.`);
+      // Get the authentication token
+      const token = tokenManager.getToken();
+      if (!token) {
+        alert('Please log in again to submit validation');
+        return;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/events/${eventId}/validate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          predicted_outcome: selectedOutcome,
+          confidence_level: null,
+          validation_notes: null
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || `Failed to submit validation: ${response.status}`);
+      }
+
+      const validationResult = await response.json();
       
-      // Remove from local state to simulate submission
+      alert(`Thank you for validating! Your settlement vote for "${selectedOutcome}" has been recorded and will contribute to the consensus mechanism.`);
+      
+      // Remove from local state as the event has been validated by this user
       setSettlableEvents(prev => prev.filter(event => event.id !== eventId));
       
     } catch (err) {
       console.error('Failed to submit settlement:', err);
-      alert('Failed to submit settlement validation. Please try again.');
+      alert(err instanceof Error ? err.message : 'Failed to submit settlement validation. Please try again.');
     }
   };
 

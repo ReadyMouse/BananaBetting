@@ -10,7 +10,8 @@ import {
   FileText, 
   HelpCircle,
   Users,
-  Plus
+  Plus,
+  DollarSign
 } from 'lucide-react';
 import Disclaimer from './Disclaimer';
 
@@ -86,6 +87,17 @@ const footerLinks = [
         href: '/terms',
         icon: FileText,
         emoji: '📄'
+      }
+    ]
+  },
+  {
+    title: 'Admin',
+    links: [
+      {
+        name: 'Payouts',
+        href: '/payouts',
+        icon: DollarSign,
+        emoji: '💰'
       }
     ]
   }

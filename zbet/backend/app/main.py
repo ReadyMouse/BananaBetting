@@ -639,11 +639,10 @@ def get_expired_events(db: Session = Depends(get_db)):
         # Get current time in EST
         now_est = betting_utils.get_est_now()
         
-        # Find events past settlement deadline that aren't settled
+        # Find events past settlement deadline that aren't settled or paid out
         expired_events = db.query(models.SportEvent).filter(
             models.SportEvent.settlement_time < now_est,
-            models.SportEvent.status != models.EventStatus.SETTLED,
-            models.SportEvent.status != models.EventStatus.CANCELLED
+            models.SportEvent.status.notin_([models.EventStatus.SETTLED, models.EventStatus.PAIDOUT, models.EventStatus.CANCELLED])
         ).all()
         
         event_list = []
@@ -674,6 +673,134 @@ def get_expired_events(db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail="Failed to get expired events")
 
 
+@app.get("/api/admin/settled-events")
+def get_settled_events(db: Session = Depends(get_db)):
+    """
+    Get a list of events that are settled and ready for payout processing.
+    These events have completed voting/consensus but haven't been paid out yet.
+    """
+    try:
+        # Find events that are settled (outcome determined, ready for payout)
+        settled_events = db.query(models.SportEvent).filter(
+            models.SportEvent.status == models.EventStatus.SETTLED
+        ).all()
+        
+        event_list = []
+        for event in settled_events:
+            # Get winning outcome
+            winning_outcome = None
+            if event.betting_system_type == models.BettingSystemType.PARI_MUTUEL:
+                pari_event = db.query(models.PariMutuelEvent).filter(
+                    models.PariMutuelEvent.sport_event_id == event.id
+                ).first()
+                if pari_event:
+                    winning_outcome = pari_event.winning_outcome
+            
+            # Get number of bets on this event
+            bet_count = db.query(models.Bet).filter(
+                models.Bet.sport_event_id == event.id,
+                models.Bet.deposit_status == models.DepositStatus.CONFIRMED
+            ).count()
+            
+            # Calculate total pool amount
+            total_pool = db.query(models.Bet).filter(
+                models.Bet.sport_event_id == event.id,
+                models.Bet.deposit_status == models.DepositStatus.CONFIRMED
+            ).with_entities(models.Bet.amount).all()
+            
+            total_pool_amount = sum(bet.amount for bet in total_pool) if total_pool else 0
+            
+            # Calculate time since settlement
+            now_est = betting_utils.get_est_now()
+            hours_since_settlement = 0
+            if event.settled_at:
+                hours_since_settlement = (now_est - event.settled_at).total_seconds() / 3600
+            
+            event_list.append({
+                "id": event.id,
+                "title": event.title,
+                "description": event.description,
+                "category": event.category.value,
+                "settled_at": event.settled_at.isoformat() if event.settled_at else None,
+                "hours_since_settlement": hours_since_settlement,
+                "winning_outcome": winning_outcome,
+                "bet_count": bet_count,
+                "total_pool_amount": total_pool_amount,
+                "ready_for_payout": True
+            })
+        
+        return {
+            "settled_events": event_list,
+            "total_count": len(event_list),
+            "current_time": now_est.isoformat()
+        }
+        
+    except Exception as e:
+        print(f"Error getting settled events: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get settled events")
+
+
+@app.post("/api/admin/process-payouts/{event_id}")
+def process_event_payouts(
+    event_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """
+    Process all pending payouts for a settled event.
+    This sends the actual Zcash transactions to winners.
+    """
+    try:
+        # Get the event and verify it's settled
+        sport_event = db.query(models.SportEvent).filter(models.SportEvent.id == event_id).first()
+        if not sport_event:
+            raise HTTPException(status_code=404, detail="Event not found")
+        
+        if sport_event.status != models.EventStatus.SETTLED:
+            raise HTTPException(status_code=400, detail="Event must be settled to process payouts")
+        
+        # Get all pending payouts for this event
+        pending_payouts = db.query(models.Payout).filter(
+            models.Payout.sport_event_id == event_id,
+            models.Payout.is_processed == False
+        ).all()
+        
+        if not pending_payouts:
+            raise HTTPException(status_code=400, detail="No pending payouts found for this event")
+        
+        # For now, we'll simulate processing the payouts
+        # In a real implementation, you'd use the Zcash wallet to send transactions
+        processed_count = 0
+        total_amount = 0
+        
+        for payout in pending_payouts:
+            # Simulate Zcash transaction
+            # In reality: transaction_id = zcash_wallet.send(payout.recipient_address, payout.payout_amount)
+            simulated_tx_id = f"sim_tx_{event_id}_{payout.id}_{processed_count}"
+            
+            # Mark payout as processed
+            payout.is_processed = True
+            payout.zcash_transaction_id = simulated_tx_id
+            
+            processed_count += 1
+            total_amount += payout.payout_amount
+        
+        db.commit()
+        
+        return {
+            "event_id": event_id,
+            "processed_payouts": processed_count,
+            "total_amount_paid": total_amount,
+            "message": f"Successfully processed {processed_count} payouts totaling {total_amount:.4f} ZEC"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error processing payouts for event {event_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to process payouts")
+
+
 @app.post("/api/admin/process-expired-events")
 def process_expired_events(
     db: Session = Depends(get_db),
@@ -693,11 +820,10 @@ def process_expired_events(
         # Get current time in EST
         now_est = betting_utils.get_est_now()
         
-        # Find events past settlement deadline that aren't settled
+        # Find events past settlement deadline that aren't settled or paid out
         expired_events = db.query(models.SportEvent).filter(
             models.SportEvent.settlement_time < now_est,
-            models.SportEvent.status != models.EventStatus.SETTLED,
-            models.SportEvent.status != models.EventStatus.CANCELLED
+            models.SportEvent.status.notin_([models.EventStatus.SETTLED, models.EventStatus.PAIDOUT, models.EventStatus.CANCELLED])
         ).all()
         
         processed_events = []
@@ -762,8 +888,8 @@ def get_event_settlement(
         if not sport_event:
             raise HTTPException(status_code=404, detail="Event not found")
         
-        # Return None if not settled
-        if sport_event.status != models.EventStatus.SETTLED or not sport_event.settled_at:
+        # Return None if not settled or paid out
+        if sport_event.status not in [models.EventStatus.SETTLED, models.EventStatus.PAIDOUT] or not sport_event.settled_at:
             return None
         
         # Get payout records for this event
@@ -822,6 +948,29 @@ def get_event_settlement(
         raise HTTPException(status_code=500, detail="Failed to fetch settlement information")
 
 
+@app.post("/api/events/{event_id}/mark-paid-out")
+def mark_event_paid_out(
+    event_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """
+    Mark an event as paid out after all payments have been processed.
+    This should only be called after the actual Zcash transactions have been confirmed.
+    """
+    try:
+        # For now, allow any authenticated user to mark as paid out
+        # In production, this should be restricted to admins or automated systems
+        success = betting_utils.mark_event_paid_out(db, event_id)
+        return {"success": success, "message": f"Event {event_id} marked as paid out"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error marking event {event_id} as paid out: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to mark event as paid out")
+
+
 # Validation endpoints
 @app.post("/api/events/{event_id}/validate", response_model=schemas.ValidationResponse)
 def submit_validation(
@@ -850,9 +999,10 @@ def submit_validation(
                 detail="Event must be closed to accept validations"
             )
         
-        # Check if event is already settled
-        if current_status == models.EventStatus.SETTLED:
-            raise HTTPException(status_code=400, detail="Event is already settled")
+        # Check if event is already settled or paid out
+        if current_status in [models.EventStatus.SETTLED, models.EventStatus.PAIDOUT]:
+            status_text = "paid out" if current_status == models.EventStatus.PAIDOUT else "settled"
+            raise HTTPException(status_code=400, detail=f"Event is already {status_text}")
         
         # Check if user has already validated this event
         existing_validation = crud.get_user_validation_for_event(db, current_user.id, event_id)

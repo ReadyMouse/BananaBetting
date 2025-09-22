@@ -71,7 +71,7 @@ export default function ValidationStatusCard({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isAuthenticated && (eventStatus === 'closed' || eventStatus === 'settled')) {
+    if (isAuthenticated && (eventStatus === 'closed' || eventStatus === 'settled' || eventStatus === 'paidout')) {
       // Add a small delay to ensure token is available
       const timer = setTimeout(() => {
         fetchValidationData();
@@ -207,12 +207,14 @@ export default function ValidationStatusCard({
         <h3 className="text-lg font-bold text-baseball-800">Validation Status</h3>
       </div>
 
-      {eventStatus === 'settled' ? (
-        // Event is settled - show final results
+      {eventStatus === 'settled' || eventStatus === 'paidout' ? (
+        // Event is settled or paid out - show final results
         <div className="space-y-4">
           <div className="flex items-center space-x-2 text-green-600">
             <CheckCircle size={16} />
-            <span className="font-medium">Event Settled</span>
+            <span className="font-medium">
+              {eventStatus === 'paidout' ? 'Event Paid Out' : 'Event Settled'}
+            </span>
           </div>
           
           {shouldShowMetrics && validationData && (
