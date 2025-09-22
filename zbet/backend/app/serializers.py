@@ -4,8 +4,10 @@ Data serializers for transforming database models to API response formats.
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
+from typing import List
 
 from . import models, schemas
+from .config import settings
 
 
 def _calculate_potential_payout(bet: models.Bet, sport_event: models.SportEvent, db: Session) -> float:
@@ -157,3 +159,104 @@ def transform_bet_to_response(bet: models.Bet, db: Session) -> schemas.BetRespon
         potentialPayout=potential_payout,
         bet=sport_event_response
     )
+
+
+def serialize_event_payout_details(sport_event: models.SportEvent, pari_event: models.PariMutuelEvent, 
+                                 payouts: List[models.Payout], bets: List[models.Bet]) -> dict:
+    """
+    Serialize payout details for a settled event using existing database records.
+    """
+    
+    # Format bet data
+    bet_data = []
+    for bet in bets:
+        outcome = bet.outcome.value if bet.outcome else "LOSS"
+        bet_data.append({
+            "id": bet.id,
+            "user_id": bet.user_id,
+            "amount": bet.amount,
+            "predicted_outcome": bet.predicted_outcome,
+            "outcome": outcome,
+            "payout_amount": bet.payout_amount if bet.payout_amount else 0.0,
+            "user": {
+                "username": bet.user.username,
+                "zcash_address": bet.user.zcash_address
+            }
+        })
+    
+    # Format payout records with user information for validators
+    payout_records = []
+    for payout in payouts:
+        payout_record = {
+            "user_id": payout.user_id,
+            "bet_id": payout.bet_id,
+            "payout_amount": payout.payout_amount,
+            "payout_type": payout.payout_type,
+            "recipient_address": payout.recipient_address
+        }
+        
+        # Add user information for validator payouts
+        if payout.payout_type == "validator_fee" and payout.user:
+            payout_record["user"] = {
+                "username": payout.user.username,
+                "zcash_address": payout.user.zcash_address
+            }
+        
+        payout_records.append(payout_record)
+    
+    # Calculate pool breakdown
+    winning_pool_amount = 0
+    if pari_event and pari_event.winning_outcome:
+        from sqlalchemy import func
+        # Import here to avoid circular imports
+        from .database import SessionLocal
+        
+        # Use a temporary session to avoid session issues
+        with SessionLocal() as temp_db:
+            winning_pool = temp_db.query(models.PariMutuelPool).filter(
+                models.PariMutuelPool.pari_mutuel_event_id == pari_event.id,
+                models.PariMutuelPool.outcome_name == pari_event.winning_outcome
+            ).first()
+            if winning_pool:
+                winning_pool_amount = winning_pool.pool_amount
+    
+    total_pool_amount = pari_event.total_pool if pari_event else 0
+    losing_pool_amount = total_pool_amount - winning_pool_amount
+    
+    # Calculate fees from payout records
+    house_fee = sum(p.payout_amount for p in payouts if p.payout_type == "house_fee")
+    creator_fee = sum(p.payout_amount for p in payouts if p.payout_type == "creator_fee")
+    validator_fee = sum(p.payout_amount for p in payouts if p.payout_type == "validator_fee")
+    total_fees = house_fee + creator_fee + validator_fee
+    
+    return {
+        "event_id": sport_event.id,
+        "event_title": sport_event.title,
+        "winning_outcome": pari_event.winning_outcome if pari_event else None,
+        "total_pool_amount": total_pool_amount,
+        "winning_pool_amount": winning_pool_amount,
+        "losing_pool_amount": losing_pool_amount,
+        "total_fees": total_fees,
+        "house_fee": house_fee,
+        "creator_fee": creator_fee,
+        "validator_fee": validator_fee,
+        "charity_fee": house_fee,  # Charity gets the house fee
+        "house_address": settings.get_house_address(),  # Add house address from config
+        "bets": bet_data,
+        "payout_records": payout_records,
+        "nonprofit": {
+            "id": sport_event.nonprofit.id,
+            "name": sport_event.nonprofit.name,
+            "zcash_transparent_address": sport_event.nonprofit.zcash_transparent_address
+        },
+        "creator": {
+            "id": sport_event.creator_id,
+            "username": sport_event.creator.username,
+            "zcash_address": sport_event.creator.zcash_address
+        },
+        "fee_percentages": {
+            "house_fee_percentage": pari_event.house_fee_percentage if pari_event else 0,
+            "creator_fee_percentage": pari_event.creator_fee_percentage if pari_event else 0,
+            "validator_fee_percentage": pari_event.validator_fee_percentage if pari_event else 0
+        }
+    }

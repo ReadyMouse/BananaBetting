@@ -116,8 +116,9 @@ def create_pari_mutuel_event(db: Session, sport_event_id: int, pari_mutuel_data:
         minimum_bet=0.001,  # Default minimum bet
         maximum_bet=1.0,    # Default maximum bet
         house_fee_percentage=0.05,  # Default 5% house fee
-        creator_fee_percentage=0.02,  # Default 2% creator fee
-        validator_fee_percentage=0.02  # Default 2% validator fee
+        creator_fee_percentage=0.05,  # Default 5% creator fee
+        validator_fee_percentage=0.2,  # Default 20% validator fee
+        charity_fee_percentage=0.6  # Default 60% charity fee
     )
     
     db.add(db_pari_event)

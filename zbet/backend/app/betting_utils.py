@@ -349,6 +349,7 @@ def _process_event_payouts(db: Session, sport_event: models.SportEvent, winning_
     total_house_fees = 0.0
     total_creator_fees = 0.0
     total_validator_fees = 0.0
+    total_charity_fees = 0.0
     
     # No fees for PUSH/TIE outcomes - everyone just gets refunded
     is_push_outcome = winning_outcome.lower() in ["push", "tie"]
@@ -373,6 +374,7 @@ def _process_event_payouts(db: Session, sport_event: models.SportEvent, winning_
                     total_house_fees = losing_pool_gross * pari_event.house_fee_percentage
                     total_creator_fees = losing_pool_gross * pari_event.creator_fee_percentage
                     total_validator_fees = losing_pool_gross * pari_event.validator_fee_percentage
+                    total_charity_fees = losing_pool_gross * pari_event.charity_fee_percentage
 
     # Process all bets
     for bet in bets:
@@ -404,21 +406,16 @@ def _process_event_payouts(db: Session, sport_event: models.SportEvent, winning_
             ))
             
         elif bet.predicted_outcome == winning_outcome:
-            # Winning bet
+            # Winning bet - winner gets refund (original bet amount back)
             bet.outcome = models.BetOutcome.WIN
-            
-            # Calculate the settlement payout (fees already deducted for pari-mutuel)
-            net_payout = _calculate_settlement_payout(db, sport_event, bet, winning_outcome)
-            
-            # Store payout details in bet
-            bet.payout_amount = net_payout
-            
-            # Create payout record in database
+            bet.payout_amount = bet.amount  # Refund = original bet amount
+                        
+            # Create payout record in database for winner's refund
             payout = models.Payout(
                 user_id=bet.user_id,
                 bet_id=bet.id,
                 sport_event_id=sport_event.id,
-                payout_amount=net_payout,
+                payout_amount=bet.amount,  # Refund = original bet amount
                 recipient_address=bet.user.zcash_address,
                 payout_type="user_winning",
                 is_processed=False
@@ -429,7 +426,7 @@ def _process_event_payouts(db: Session, sport_event: models.SportEvent, winning_
             payout_records.append(schemas.PayoutRecord(
                 user_id=bet.user_id,
                 bet_id=bet.id,
-                payout_amount=net_payout,
+                payout_amount=bet.amount,  # Refund = original bet amount
                 payout_type="user_winning",
                 recipient_address=bet.user.zcash_address
             ))
@@ -486,6 +483,30 @@ def _process_event_payouts(db: Session, sport_event: models.SportEvent, winning_
             payout_type="creator_fee",
             recipient_address=creator_address
         ))
+
+    # Create charity fee payout record if there are fees to collect
+    if total_charity_fees > 0:
+        # Get creator address from the event data
+        charity_address = sport_event.nonprofit.zcash_transparent_address
+        
+        charity_payout = models.Payout(
+            user_id=None,  # Nonprofits are not users, similar to house fees
+            bet_id=None,   # No specific bet
+            sport_event_id=sport_event.id,
+            payout_amount=total_charity_fees,
+            recipient_address=charity_address,
+            payout_type="charity_fee",
+            is_processed=False
+        )
+        db.add(charity_payout)
+        
+        payout_records.append(schemas.PayoutRecord(
+            user_id=None,
+            bet_id=None,
+            payout_amount=total_charity_fees,
+            payout_type="charity_fee",
+            recipient_address=charity_address
+        ))
     
     # Create validator fee payout records if there are fees to collect
     if total_validator_fees > 0:
@@ -529,79 +550,6 @@ def _process_event_payouts(db: Session, sport_event: models.SportEvent, winning_
             pass
     
     return payout_records
-
-
-def _calculate_settlement_payout(db: Session, sport_event: models.SportEvent, bet: models.Bet, winning_outcome: str) -> float:
-    """
-    Calculate the settlement payout for a winning bet.
-    
-    For pari-mutuel: Returns net payout (fees already deducted from losing pool)
-    For other systems: Returns gross payout (before fee deduction)
-    
-    This is the authoritative payout calculation used during settlement,
-    separate from the display-only serializer calculations.
-    """
-    
-    if sport_event.betting_system_type == models.BettingSystemType.PARI_MUTUEL:
-        # Get pari-mutuel event
-        pari_event = db.query(models.PariMutuelEvent).filter(
-            models.PariMutuelEvent.sport_event_id == sport_event.id
-        ).first()
-        
-        if not pari_event:
-            return bet.amount  # Fallback to bet amount
-        
-        # Find the winning pool
-        winning_pool = db.query(models.PariMutuelPool).filter(
-            models.PariMutuelPool.pari_mutuel_event_id == pari_event.id,
-            models.PariMutuelPool.outcome_name == winning_outcome
-        ).first()
-        
-        if not winning_pool or winning_pool.pool_amount <= 0:
-            return bet.amount  # Fallback to bet amount
-        
-        # Calculate total losing pools (all pools except the winning one)
-        losing_pool_gross = pari_event.total_pool - winning_pool.pool_amount
-        
-        # Special case: No losing pool means no one bet against the winners
-        # In this case, just return everyone's bet without penalty (no fees)
-        if losing_pool_gross <= 0:
-            return bet.amount
-        
-        # Normal pari-mutuel formula:
-        # Payout = Original Bet + (User's Bet / Winning Pool) × (Losing Pools - Fees)
-        
-        # Deduct fees from the losing pool (fees come off the top)
-        total_fee_percentage = pari_event.house_fee_percentage + pari_event.creator_fee_percentage + pari_event.validator_fee_percentage
-        losing_pool_after_fees = losing_pool_gross * (1 - total_fee_percentage)
-        
-        # User gets their bet back + proportional share of net losing money
-        user_share_ratio = bet.amount / winning_pool.pool_amount
-        share_of_losing_money = losing_pool_after_fees * user_share_ratio
-        net_payout = bet.amount + share_of_losing_money
-        
-        return net_payout
-        
-    elif sport_event.betting_system_type == models.BettingSystemType.FIXED_ODDS:
-        # Fixed odds: Bet Amount × Odds
-        # TODO: Get actual odds from database when implemented
-        # For now, use the same logic as serializer but this should be from stored odds
-        odds_map = {
-            "team_a_wins": 2.1, "team_b_wins": 1.9, "tie": 3.2, "draw": 3.2,
-            "player_scores": 2.8, "player_assists": 3.1, "player_homers": 4.5,
-            "over": 1.95, "under": 1.95, "option_a": 2.1, "option_b": 2.1,
-        }
-        
-        odds = odds_map.get(bet.predicted_outcome, 2.1)  # Default 2.1x odds
-        return bet.amount * odds
-        
-    elif sport_event.betting_system_type == models.BettingSystemType.SPREAD:
-        # Spread betting: typically around 1.9x odds
-        return bet.amount * 1.9
-        
-    else:
-        # Fallback: 1:1 payout
-        return bet.amount
 
 def _send_batch_payouts(pool_address: str, payout_records: List[schemas.PayoutRecord]) -> str:
     """

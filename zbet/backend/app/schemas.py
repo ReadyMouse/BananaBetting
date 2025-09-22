@@ -69,6 +69,7 @@ class PariMutuelEventResponse(BaseModel):
     house_fee_percentage: float
     creator_fee_percentage: float
     validator_fee_percentage: float
+    charity_fee_percentage: float
     total_pool: float
     winning_outcome: str | None = None
     betting_pools: list[PariMutuelPoolResponse] = []

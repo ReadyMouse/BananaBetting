@@ -187,8 +187,9 @@ class PariMutuelEvent(Base):
     minimum_bet = Column(Float, nullable=False, default=0.001)
     maximum_bet = Column(Float, nullable=False, default=1.0)
     house_fee_percentage = Column(Float, default=0.05, nullable=False)  # 5% default house fee
-    creator_fee_percentage = Column(Float, default=0.02, nullable=False)  # 2% default creator fee
-    validator_fee_percentage = Column(Float, default=0.02, nullable=False)  # 2% default validator fee
+    creator_fee_percentage = Column(Float, default=0.05, nullable=False)  # 5% default creator fee
+    validator_fee_percentage = Column(Float, default=0.2, nullable=False)  # 20% default validator fee
+    charity_fee_percentage = Column(Float, default=0.6, nullable=False)  # 60% default charity fee
     
     # Relationships
     betting_pools = relationship("PariMutuelPool", back_populates="pari_mutuel_event")
@@ -212,6 +213,7 @@ class PariMutuelEvent(Base):
             "house_fee_percentage": self.house_fee_percentage,
             "creator_fee_percentage": self.creator_fee_percentage,
             "validator_fee_percentage": self.validator_fee_percentage,
+            "charity_fee_percentage": self.charity_fee_percentage,
             "total_pool": self.total_pool,
             "winning_outcome": self.winning_outcome,
             "betting_pools": [pool.to_dict() for pool in pools]

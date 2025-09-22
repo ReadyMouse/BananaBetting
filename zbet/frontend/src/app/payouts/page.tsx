@@ -70,8 +70,18 @@ export default function PayoutsPage() {
       setLoading(true);
       setError(null);
       
+      // Get the authentication token
+      const token = tokenManager.getToken();
+      if (!token) {
+        throw new Error('Authentication required. Please log in again.');
+      }
+      
       // Get settled events that are ready for payout processing
-      const response = await fetch(`${API_BASE_URL}/api/admin/settled-events`);
+      const response = await fetch(`${API_BASE_URL}/api/admin/settled-events`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       
       if (!response.ok) {
         throw new Error(`Failed to fetch settled events: ${response.status}`);
@@ -89,8 +99,40 @@ export default function PayoutsPage() {
   };
 
   const handlePayout = async (eventId: number) => {
-    // Placeholder for payout processing - will be implemented later
-    alert(`Would process payout for event ${eventId}. (Not implemented yet)`);
+    try {
+      setProcessingEventId(eventId);
+      
+      // Get the authentication token
+      const token = tokenManager.getToken();
+      if (!token) {
+        throw new Error('Authentication required. Please log in again.');
+      }
+      
+      // First, call process-payouts to create the payout records
+      const response = await fetch(`${API_BASE_URL}/api/admin/events/${eventId}/process-payouts`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to process payouts: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      console.log('Payout processing result:', result);
+      
+      // Navigate to the payout detail page to show the created records
+      router.push(`/payouts/${eventId}`);
+      
+    } catch (err) {
+      console.error('Failed to process payouts:', err);
+      alert(`Failed to process payouts: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setProcessingEventId(null);
+    }
   };
 
   const getSettlementStatus = (event: SettledEvent) => {
@@ -329,12 +371,27 @@ export default function PayoutsPage() {
                     
                     <motion.button
                       onClick={() => handlePayout(event.id)}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      className="flex items-center space-x-2 px-6 py-2 rounded-lg font-medium transition-all duration-200 bg-grass-500 hover:bg-grass-600 text-white"
+                      disabled={processingEventId === event.id}
+                      whileHover={{ scale: processingEventId === event.id ? 1 : 1.05 }}
+                      whileTap={{ scale: processingEventId === event.id ? 1 : 0.95 }}
+                      className={cn(
+                        "flex items-center space-x-2 px-6 py-2 rounded-lg font-medium transition-all duration-200",
+                        processingEventId === event.id
+                          ? "bg-gray-400 text-gray-700 cursor-not-allowed"
+                          : "bg-grass-500 hover:bg-grass-600 text-white"
+                      )}
                     >
-                      <DollarSign size={16} />
-                      <span>Process Payout</span>
+                      {processingEventId === event.id ? (
+                        <>
+                          <RefreshCw className="animate-spin" size={16} />
+                          <span>Processing...</span>
+                        </>
+                      ) : (
+                        <>
+                          <DollarSign size={16} />
+                          <span>Process Payout</span>
+                        </>
+                      )}
                     </motion.button>
                   </div>
                 </motion.div>

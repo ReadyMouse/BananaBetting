@@ -740,65 +740,164 @@ def get_settled_events(db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail="Failed to get settled events")
 
 
-@app.post("/api/admin/process-payouts/{event_id}")
-def process_event_payouts(
+@app.get("/api/admin/events/{event_id}/payout-calculation")
+def get_payout_calculation(
     event_id: int,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
     """
-    Process all pending payouts for a settled event.
-    This sends the actual Zcash transactions to winners.
+    Get detailed payout calculation for a settled event.
+    Uses existing functions and database records.
     """
+    # Just query the existing payout and bet records that were created during settlement
     try:
-        # Get the event and verify it's settled
-        sport_event = db.query(models.SportEvent).filter(models.SportEvent.id == event_id).first()
+        # Eagerly load the nonprofit and creator relationships
+        from sqlalchemy.orm import joinedload
+        
+        sport_event = db.query(models.SportEvent).options(
+            joinedload(models.SportEvent.nonprofit),
+            joinedload(models.SportEvent.creator)
+        ).filter(models.SportEvent.id == event_id).first()
+        
+        if not sport_event or sport_event.status != models.EventStatus.SETTLED:
+            raise HTTPException(status_code=400, detail="Event must be settled")
+        
+        pari_event = db.query(models.PariMutuelEvent).filter(
+            models.PariMutuelEvent.sport_event_id == event_id
+        ).first()
+        
+        payouts = db.query(models.Payout).options(
+            joinedload(models.Payout.user)
+        ).filter(models.Payout.sport_event_id == event_id).all()
+        bets = db.query(models.Bet).options(
+            joinedload(models.Bet.user)
+        ).filter(
+            models.Bet.sport_event_id == event_id,
+            models.Bet.deposit_status == models.DepositStatus.CONFIRMED
+        ).all()
+        
+        # Simple serialization - use existing data
+        return serializers.serialize_event_payout_details(sport_event, pari_event, payouts, bets)
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/admin/events/{event_id}/process-payouts")
+def process_event_payouts(
+    event_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Create payout records for preview (does not send blockchain transactions)."""
+    try:
+        # Get the event with relationships
+        from sqlalchemy.orm import joinedload
+        
+        sport_event = db.query(models.SportEvent).options(
+            joinedload(models.SportEvent.nonprofit),
+            joinedload(models.SportEvent.creator)
+        ).filter(models.SportEvent.id == event_id).first()
+        
         if not sport_event:
             raise HTTPException(status_code=404, detail="Event not found")
         
         if sport_event.status != models.EventStatus.SETTLED:
-            raise HTTPException(status_code=400, detail="Event must be settled to process payouts")
+            raise HTTPException(status_code=400, detail="Event must be settled before processing payouts")
         
-        # Get all pending payouts for this event
+        # Check for existing pending payouts
+        pending_payouts = db.query(models.Payout).filter(
+            models.Payout.sport_event_id == event_id,
+            models.Payout.is_processed == False
+        ).all()
+        
+        # If no pending payouts exist, create them from the settled event
+        if not pending_payouts:
+            print(f"No existing payouts found for event {event_id}. Creating payout records...")
+            
+            # Get the pari-mutuel event to find the winning outcome
+            pari_event = db.query(models.PariMutuelEvent).filter(
+                models.PariMutuelEvent.sport_event_id == event_id
+            ).first()
+            
+            if not pari_event or not pari_event.winning_outcome:
+                raise HTTPException(status_code=400, detail="Event must have a winning outcome to process payouts")
+            
+            # Use the existing settlement logic to create payout records
+            # This reuses the same logic from betting_utils._process_event_payouts
+            payout_records_list = betting_utils._process_event_payouts(db, sport_event, pari_event.winning_outcome)
+            
+            # The above function creates the Payout records in the database
+            # Now query for the newly created pending payouts
+            pending_payouts = db.query(models.Payout).filter(
+                models.Payout.sport_event_id == event_id,
+                models.Payout.is_processed == False
+            ).all()
+            
+            if not pending_payouts:
+                raise HTTPException(status_code=400, detail="Failed to create payout records")
+        
+        db.commit()
+        
+        return {
+            "event_id": event_id,
+            "created_payouts": len(pending_payouts),
+            "total_amount_calculated": sum(p.payout_amount for p in pending_payouts),
+            "message": "Payout records created successfully. Ready for review."
+        }
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/admin/events/{event_id}/send-payouts")
+def send_event_payouts(
+    event_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Send blockchain transactions for existing payout records."""
+    try:
+        # Get existing pending payouts
         pending_payouts = db.query(models.Payout).filter(
             models.Payout.sport_event_id == event_id,
             models.Payout.is_processed == False
         ).all()
         
         if not pending_payouts:
-            raise HTTPException(status_code=400, detail="No pending payouts found for this event")
+            raise HTTPException(status_code=400, detail="No pending payouts found. Process payouts first.")
         
-        # For now, we'll simulate processing the payouts
-        # In a real implementation, you'd use the Zcash wallet to send transactions
-        processed_count = 0
-        total_amount = 0
+        # Convert to PayoutRecord format for the batch payout function
+        payout_records = [
+            schemas.PayoutRecord(
+                user_id=p.user_id, bet_id=p.bet_id, payout_amount=p.payout_amount,
+                payout_type=p.payout_type, recipient_address=p.recipient_address
+            ) for p in pending_payouts
+        ]
         
+        # Send the batch payout transaction
+        pool_address = settings.get_pool_address()
+        transaction_id = betting_utils._send_batch_payouts(pool_address, payout_records)
+        
+        # Mark as processed
         for payout in pending_payouts:
-            # Simulate Zcash transaction
-            # In reality: transaction_id = zcash_wallet.send(payout.recipient_address, payout.payout_amount)
-            simulated_tx_id = f"sim_tx_{event_id}_{payout.id}_{processed_count}"
-            
-            # Mark payout as processed
             payout.is_processed = True
-            payout.zcash_transaction_id = simulated_tx_id
-            
-            processed_count += 1
-            total_amount += payout.payout_amount
+            payout.zcash_transaction_id = transaction_id
         
         db.commit()
         
         return {
             "event_id": event_id,
-            "processed_payouts": processed_count,
-            "total_amount_paid": total_amount,
-            "message": f"Successfully processed {processed_count} payouts totaling {total_amount:.4f} ZEC"
+            "processed_payouts": len(pending_payouts),
+            "total_amount_paid": sum(p.payout_amount for p in pending_payouts),
+            "transaction_id": transaction_id
         }
         
-    except HTTPException:
-        raise
     except Exception as e:
-        print(f"Error processing payouts for event {event_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to process payouts")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/api/admin/process-expired-events")
