@@ -8,15 +8,15 @@ Ready Mouse zcash address: u18k2wk6dk9qarekd03v8qgy29qhxp9jag6mmkvvspwrszp0sd48m
 
 **BananaBetting** transforms traditional fundraising and charity donations into an interactive, sports betting experience:
 
-Charities -> Join our database of crypto-accepting 503(c) Non-profits
-Organizations + Influencers -> Create events to bet on
-Betters -> Bet on the outcome of fun events 
-Validators -> Manual determine the outcome of events 
-BananaBetting -> Resolves all transcations, pays out Charities, event creators, and validators 
+- **Charities** -> Join our database of crypto-accepting 503(c) Non-profits
+- **Organizations** + Influencers -> Create events to bet on
+- **Betters** -> Bet on the outcome of fun events 
+- **Validators** -> Manual determine the outcome of events 
+- **BananaBetting** -> Resolves all transcations, pays out Charities, event creators, and validators 
 
 ## Transparent + Sheilded Transcations
-- Private transcations -> to pay the indidividual validators and events creators
-- Public transcation -> to pay the charities with a clear paper trail 
+- **Private transcation** -> to pay the indidividual validators and events creators
+- **Public transcation** -> to pay the charities with a clear paper trail 
 
 ## 🚀 Core Features
 - **Charity Betting**: A pari-mutel betting system for charity and remote work opportunities
