@@ -405,8 +405,8 @@ def place_bet(
         if not sport_event:
             raise HTTPException(status_code=404, detail="Sport event not found")
         
-        # Validate the bet request
-        betting_utils.validate_bet_for_event(sport_event, bet_request.predicted_outcome, bet_request.amount)
+        # Validate the bet request (including balance check)
+        betting_utils.validate_bet_for_event(sport_event, bet_request.predicted_outcome, bet_request.amount, db, current_user.id)
         
         # Create the bet record
         bet = crud.create_bet(db, bet_request, current_user.id)
@@ -427,6 +427,52 @@ def place_bet(
         print(f"Error placing bet: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to place bet")
 
+
+@app.post("/api/users/me/deposit")
+def add_user_deposit(
+    deposit_data: dict,
+    current_user: models.User = Depends(get_current_user)
+):
+    """Add a deposit to user's balance (for testing/development)"""
+    try:
+        amount = float(deposit_data.get("amount", 0))
+        if amount <= 0:
+            raise HTTPException(status_code=400, detail="Deposit amount must be positive")
+        
+        from .zcash_mod import zcash_wallet
+        
+        # Add to user's balance using their address
+        user_address = current_user.zcash_transparent_address or current_user.zcash_address
+        if user_address:
+            zcash_wallet.add_user_balance(user_address, amount)
+            new_balance = zcash_wallet.get_user_balance_by_address(user_address)
+            
+            return {
+                "message": f"Added {amount} ZEC to your balance",
+                "new_balance": new_balance,
+                "currency": "ZEC"
+            }
+        else:
+            raise HTTPException(status_code=400, detail="User has no Zcash address configured")
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error adding deposit: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to add deposit")
+
+@app.get("/api/pool/balance")
+def get_pool_balance(current_user: models.User = Depends(get_current_user)):
+    """Get pool balance (admin only for now)"""
+    try:
+        from .zcash_mod import zcash_wallet
+        balance = zcash_wallet.get_pool_balance()
+        return {
+            "pool_balance": balance,
+            "currency": "ZEC"
+        }
+    except Exception as e:
+        print(f"Error getting pool balance: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get pool balance")
 
 @app.get("/api/config")
 def get_configuration():
@@ -881,10 +927,19 @@ def send_event_payouts(
         pool_address = settings.get_pool_address()
         transaction_id = betting_utils._send_batch_payouts(pool_address, payout_records)
         
-        # Mark as processed
+        # Mark as processed and add to user balances
+        from .zcash_mod import zcash_wallet
         for payout in pending_payouts:
             payout.is_processed = True
             payout.zcash_transaction_id = transaction_id
+            
+            # Add payout to user balance (only for user winnings, not fees)
+            if payout.user_id and payout.payout_type == "user_winning":
+                user = db.query(models.User).filter(models.User.id == payout.user_id).first()
+                if user:
+                    user_address = user.zcash_transparent_address or user.zcash_address
+                    if user_address:
+                        zcash_wallet.add_user_balance(user_address, payout.payout_amount)
         
         db.commit()
         

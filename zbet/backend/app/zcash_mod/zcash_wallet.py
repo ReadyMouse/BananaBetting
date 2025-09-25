@@ -1,6 +1,10 @@
 import requests
 from fastapi import Depends, FastAPI, HTTPException, status, Query
-from ..zcash_mod import ZCASH_RPC_URL, ZCASH_RPC_USER,ZCASH_RPC_PASSWORD
+from ..zcash_mod import ZCASH_RPC_URL, ZCASH_RPC_USER, ZCASH_RPC_PASSWORD, DISABLE_ZCASH_NODE
+
+# Mock balances for development (user_id -> balance)
+_mock_user_balances = {}
+_mock_pool_balance = 1000.0
 
 def backupwallet(destination: str):
     try:
@@ -84,6 +88,12 @@ def z_listunifiedreceivers(address: str, acc_type: str):
 
 
 def get_transparent_address_balance(address: str):
+    """Get transparent address balance. Uses mock data in dev mode."""
+    if DISABLE_ZCASH_NODE:
+        # For development, return mock balance based on address
+        # Extract user_id from address if it's a user address, else return pool balance
+        return _mock_user_balances.get(address, 10.0)  # Default 10 ZEC for users
+    
     try:
         # RPC request payload
         payload = {
@@ -290,6 +300,10 @@ def z_getbalance(account: int = None, minconf: int = 1, include_watchonly: bool 
     Returns:
         Shielded balance amount
     """
+    if DISABLE_ZCASH_NODE:
+        # Return mock pool balance for dev mode
+        return _mock_pool_balance
+    
     try:
         params = []
         if account is not None:
@@ -482,3 +496,38 @@ def verify_shielded_deposit(address: str, expected_amount: float, min_confirmati
             "error": str(e),
             "message": f"Error checking shielded deposit: {str(e)}"
         }
+
+
+# Helper functions for development mode balance management
+def get_user_balance_by_address(address: str) -> float:
+    """Get user balance by their Zcash address."""
+    if DISABLE_ZCASH_NODE:
+        return _mock_user_balances.get(address, 10.0)
+    else:
+        return get_transparent_address_balance(address)
+
+def deduct_user_balance(address: str, amount: float) -> None:
+    """Deduct amount from user's balance (dev mode only)."""
+    if DISABLE_ZCASH_NODE:
+        current = _mock_user_balances.get(address, 10.0)
+        _mock_user_balances[address] = max(0, current - amount)
+
+def add_user_balance(address: str, amount: float) -> None:
+    """Add amount to user's balance (dev mode only)."""
+    if DISABLE_ZCASH_NODE:
+        current = _mock_user_balances.get(address, 10.0)
+        _mock_user_balances[address] = current + amount
+
+def get_pool_balance() -> float:
+    """Get pool balance."""
+    if DISABLE_ZCASH_NODE:
+        return _mock_pool_balance
+    else:
+        # In production, would check actual pool address
+        from ..config import settings
+        pool_address = settings.get_pool_address()
+        try:
+            return get_transparent_address_balance(pool_address)
+        except:
+            # Try shielded if transparent fails
+            return z_getbalance()

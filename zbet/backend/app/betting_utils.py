@@ -61,7 +61,7 @@ def update_pari_mutuel_pool_stats(db: Session, bet: models.Bet, sport_event: mod
     bet.set_pari_mutuel_pool_id(pool.id)
 
 
-def validate_bet_for_event(sport_event: models.SportEvent, predicted_outcome: str, amount: float):
+def validate_bet_for_event(sport_event: models.SportEvent, predicted_outcome: str, amount: float, db: Session = None, user_id: int = None):
     """Validate that a bet can be placed on the given event"""
     current_status = sport_event.get_current_status()
     if current_status != models.EventStatus.OPEN:
@@ -73,12 +73,43 @@ def validate_bet_for_event(sport_event: models.SportEvent, predicted_outcome: st
     if amount <= 0:
         raise HTTPException(status_code=400, detail="Bet amount must be positive")
     
+    # Check user balance if db and user_id are provided
+    if db is not None and user_id is not None:
+        from .zcash_mod import zcash_wallet
+        from . import models
+        
+        # Get user to check balance
+        user = db.query(models.User).filter(models.User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Check user's balance using their Zcash address
+        user_address = user.zcash_transparent_address or user.zcash_address
+        if user_address:
+            current_balance = zcash_wallet.get_user_balance_by_address(user_address)
+            if current_balance < amount:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Insufficient balance. Available: {current_balance:.4f} ZEC, Required: {amount:.4f} ZEC"
+                )
+    
     # Add betting system-specific validations here in the future
     # For example, checking minimum/maximum bet amounts, etc.
 
 
 def process_bet_placement(db: Session, bet: models.Bet, sport_event: models.SportEvent):
     """Process betting system-specific logic after a bet is placed"""
+    # Process balance deduction
+    from .zcash_mod import zcash_wallet
+    
+    # Get user and deduct balance
+    user = db.query(models.User).filter(models.User.id == bet.user_id).first()
+    if user:
+        user_address = user.zcash_transparent_address or user.zcash_address
+        if user_address:
+            zcash_wallet.deduct_user_balance(user_address, bet.amount)
+    
+    # Process betting system-specific logic
     if sport_event.betting_system_type == models.BettingSystemType.PARI_MUTUEL:
         update_pari_mutuel_pool_stats(db, bet, sport_event)
     elif sport_event.betting_system_type == models.BettingSystemType.FIXED_ODDS:
@@ -150,7 +181,7 @@ def settle_event_with_consensus(db: Session, event_id: int, pool_address: str = 
 
 def settle_event(db: Session, event_id: int, winning_outcome: str, pool_address: str = None) -> schemas.SettlementResponse:
     """
-    Settle an event with the winning outcome and process all payouts.
+    Settle an event with the winning outcome and prepare to process all payouts (but not paidout yet).
     
     Args:
         db: Database session
@@ -188,17 +219,8 @@ def settle_event(db: Session, event_id: int, winning_outcome: str, pool_address:
     # Process all bets for this event
     payout_records = _process_event_payouts(db, sport_event, winning_outcome)
     
-    # Build and send Zcash transaction if there are payouts
-    transaction_id = None
-    if payout_records:
-        transaction_id = _send_batch_payouts(pool_address, payout_records)
-        
-        # Update payout records with transaction ID
-        for payout_record in payout_records:
-            payout = db.query(models.Payout).filter(models.Payout.bet_id == payout_record.bet_id).first()
-            if payout:
-                payout.zcash_transaction_id = transaction_id
-                payout.is_processed = True
+    # Settlement only creates payout records, does NOT send transactions
+    # The actual payout happens later via the admin "Process Payout" button
     
     # Mark event as settled
     sport_event.status = models.EventStatus.SETTLED
@@ -223,7 +245,7 @@ def settle_event(db: Session, event_id: int, winning_outcome: str, pool_address:
         winning_outcome=winning_outcome,
         total_payouts=len(payout_records),
         total_payout_amount=total_payout_amount,
-        transaction_id=transaction_id,
+        transaction_id=None,  # No transaction sent during settlement
         settled_at=sport_event.settled_at.isoformat() + 'Z',
         payout_records=payout_records
     )
