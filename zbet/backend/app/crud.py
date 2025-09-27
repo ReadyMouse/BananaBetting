@@ -60,7 +60,9 @@ def create_user(db: Session, user: schemas.UserCreate):
                        f"Error: {str(e)}"
             )
     
-    db_user = models.User(email=user.email.lower(), username=user.username.lower(), zcash_account=zcash_account, zcash_address=zcash_address, zcash_transparent_address=zcash_transparent_address, hashed_password=hashed_password, balance=zcash_transparent_balance)
+    db_user = models.User(email=user.email.lower(), username=user.username.lower(), zcash_account=zcash_account, 
+    zcash_address=zcash_address, zcash_transparent_address=zcash_transparent_address, hashed_password=hashed_password, 
+    balance=zcash_transparent_balance)
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
@@ -113,8 +115,8 @@ def create_pari_mutuel_event(db: Session, sport_event_id: int, pari_mutuel_data:
     # Create the pari-mutuel event with default settings
     db_pari_event = models.PariMutuelEvent(
         sport_event_id=sport_event_id,
-        minimum_bet=0.001,  # Default minimum bet
-        maximum_bet=1.0,    # Default maximum bet
+        minimum_bet=0.000001,  # Default minimum bet
+        maximum_bet=5.0,    # Default maximum bet
         house_fee_percentage=0.05,  # Default 5% house fee
         creator_fee_percentage=0.05,  # Default 5% creator fee
         validator_fee_percentage=0.2,  # Default 20% validator fee

@@ -33,7 +33,19 @@ Ready Mouse zcash address: u18k2wk6dk9qarekd03v8qgy29qhxp9jag6mmkvvspwrszp0sd48m
 - **Zcash Node**: Running Zcash daemon with RPC enabled
 - **Git**
 
-## ⚙️ Zcash Node Configuration
+
+
+## 🚀 Quick Start
+
+### 1. Clone the Repository
+
+```bash
+git clone git@github.com:ReadyMouse/BananaBetting.git
+cd BananaBetting
+```
+### 2. Update configs
+
+⚙️ Zcash Node Configuration
 
 Ensure your Zcash node is configured with RPC access. Update the credentials in:
 `zbet/backend/app/zcash_mod/__init__.py`
@@ -44,16 +56,11 @@ ZCASH_RPC_PASSWORD = "your_rpc_password"
 ZCASH_RPC_URL = "http://127.0.0.1:8232/"
 ```
 
-## 🚀 Quick Start
+Set pool and house addresses: 
+`zbet/backend/.env`
 
-### 1. Clone the Repository
 
-```bash
-git clone git@github.com:ReadyMouse/BananaBetting.git
-cd BananaBetting
-```
-
-### 2. Launch the API
+### 3. Launch the API
 
 ```bash
 ./launch.sh

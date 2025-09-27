@@ -514,21 +514,21 @@ def settle_betting_event(
     current_user: models.User = Depends(get_current_user)
 ):
     """
-    Settle a betting event with the final outcome and process all payouts.
+    Settle a betting event with the final outcome and create payout records.
     
-    This endpoint:
+    This endpoint (Phase 1 - Settlement):
     1. Validates the winning outcome
     2. Calculates payouts for all winning bets
-    3. Creates payout records in the database
-    4. Sends a batch Zcash transaction to all winners
-    5. Marks the event as settled
+    3. Creates payout records in the database with is_processed=False
+    4. Marks the event as SETTLED (but not paid out yet)
+    5. Does NOT send any Zcash transactions
     
     Args:
         event_id: ID of the event to settle
         settlement_request: Contains the winning outcome
         
     Returns:
-        SettlementResponse with settlement details and payout information
+        SettlementResponse with settlement details and payout records (no transaction_id)
     """
     try:
         # Check if event exists and can be settled
@@ -565,19 +565,20 @@ def settle_event_with_consensus(
     """
     Settle a betting event using validation consensus to determine the winning outcome.
     
-    This endpoint:
+    This endpoint (Phase 1 - Settlement with Consensus):
     1. Checks for validation consensus (minimum 3 validators, 60% agreement)
     2. Uses the consensus outcome to settle the event automatically
     3. Calculates payouts for all winning bets
     4. Distributes validator rewards to users who validated correctly
-    5. Sends batch Zcash transactions to all recipients
-    6. Marks the event as settled
+    5. Creates payout records in the database with is_processed=False
+    6. Marks the event as SETTLED (but not paid out yet)
+    7. Does NOT send any Zcash transactions
     
     Args:
         event_id: ID of the event to settle
         
     Returns:
-        SettlementResponse with settlement details and payout information
+        SettlementResponse with settlement details and payout records (no transaction_id)
     """
     try:
         # Check if event exists and can be settled
@@ -611,12 +612,13 @@ def auto_settle_event(
     current_user: models.User = Depends(get_current_user)
 ):
     """
-    Automatically settle an event based on the best available method:
-    1. If consensus exists (60% agreement, min 3 validators) -> use consensus
-    2. If past settlement deadline -> force consensus or refund
+    Automatically settle an event based on the best available method (Phase 1 - Auto Settlement):
+    1. If consensus exists (60% agreement, min 3 validators) -> use consensus settlement
+    2. If past settlement deadline -> force settlement with refunds (PUSH)
     3. Otherwise -> error (not ready for settlement)
     
     This endpoint makes settlement decisions automatically without requiring manual outcome selection.
+    Creates payout records but does NOT send Zcash transactions.
     """
     try:
         # Get the event
@@ -794,7 +796,15 @@ def get_payout_calculation(
 ):
     """
     Get detailed payout calculation for a settled event.
-    Uses existing functions and database records.
+    
+    This endpoint:
+    1. Shows payout calculations from existing database records
+    2. Displays winner/loser breakdown and fee distributions
+    3. Used for review before sending actual payouts
+    4. Only works for events with status=SETTLED
+    
+    Returns:
+        Detailed breakdown of all calculated payouts
     """
     # Just query the existing payout and bet records that were created during settlement
     try:
@@ -836,7 +846,18 @@ def process_event_payouts(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    """Create payout records for preview (does not send blockchain transactions)."""
+    """
+    Create payout records for review (Phase 2 - Process Payouts).
+    
+    This endpoint:
+    1. Creates payout records if they don't exist (backup for settlement)
+    2. Shows calculated payout amounts for admin review
+    3. Does NOT send any Zcash transactions
+    4. Prepares records for actual payout processing
+    
+    Returns:
+        Summary of created payout records ready for review
+    """
     try:
         # Get the event with relationships
         from sqlalchemy.orm import joinedload
@@ -904,7 +925,19 @@ def send_event_payouts(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    """Send blockchain transactions for existing payout records."""
+    """
+    Send Zcash transactions for existing payout records (Phase 3 - Send Payouts).
+    
+    This endpoint:
+    1. Takes existing payout records with is_processed=False
+    2. Sends batch Zcash transactions via z_sendmany
+    3. Marks payout records as is_processed=True
+    4. Updates user balances (in dev mode)
+    5. Records transaction IDs in payout records
+    
+    Returns:
+        Summary of sent transactions with transaction_id
+    """
     try:
         # Get existing pending payouts
         pending_payouts = db.query(models.Payout).filter(
@@ -961,12 +994,13 @@ def process_expired_events(
     current_user: models.User = Depends(get_current_user)
 ):
     """
-    Process events that have passed their settlement deadline.
+    Process events that have passed their settlement deadline (Phase 1 - Batch Auto Settlement).
     
     For events past settlement deadline:
     1. Try consensus settlement first (if enough validations exist)
-    2. If no consensus, mark event as expired/cancelled
-    3. Refund all bets to users
+    2. If no consensus, settle with PUSH (refund all bets)
+    3. Creates payout records but does NOT send Zcash transactions
+    4. Events will need separate payout processing after this
     
     This should be called periodically by a cron job or background task.
     """

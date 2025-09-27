@@ -74,9 +74,6 @@ docs/_build/
 # PyBuilder
 target/
 
-# Jupyter Notebook
-.ipynb_checkpoints
-
 # IPython
 profile_default/
 ipython_config.py
@@ -109,6 +106,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+
 
 # Spyder project settings
 .spyderproject
@@ -187,6 +185,7 @@ SEED_DATABASE_README.md
 key/
 .env.local
 .env.production
+zbet/backend/app/zcash_mod/__init__.py
 
 # Zcash specific
 zcash_db_new_new.sqlite3
@@ -201,3 +200,5 @@ zchat/backend/venv/ # Virtual environment (already covered above but being expli
 # screenshots
 screenshots/*
 
+# Vercel Serverless Functions
+.vercel
