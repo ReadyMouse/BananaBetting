@@ -111,12 +111,6 @@ def process_bet_placement(db: Session, bet: models.Bet, sport_event: models.Spor
     # Process betting system-specific logic
     if sport_event.betting_system_type == models.BettingSystemType.PARI_MUTUEL:
         update_pari_mutuel_pool_stats(db, bet, sport_event)
-    elif sport_event.betting_system_type == models.BettingSystemType.FIXED_ODDS:
-        # TODO: Implement fixed odds betting logic
-        pass
-    elif sport_event.betting_system_type == models.BettingSystemType.SPREAD:
-        # TODO: Implement spread betting logic
-        pass
     else:
         raise HTTPException(
             status_code=400, 

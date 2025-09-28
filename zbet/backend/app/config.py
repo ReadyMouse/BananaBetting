@@ -10,6 +10,8 @@ load_dotenv()
 
 
 class Settings:
+    # TODO: Auto-shielding configuration (for future implementation)
+    
     """Application settings loaded from environment variables."""
     
     # Zcash Addresses

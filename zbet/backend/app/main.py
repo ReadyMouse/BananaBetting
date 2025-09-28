@@ -460,6 +460,165 @@ def add_user_deposit(
         print(f"Error adding deposit: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to add deposit")
 
+
+@app.post("/zcash/refresh-balance/")
+def refresh_balance(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Refresh user's balance from the Zcash node and update database"""
+    try:
+        from .zcash_mod import zcash_wallet
+        
+        # Get current balance from Zcash node
+        current_balance = zcash_wallet.get_transparent_address_balance(current_user.zcash_transparent_address)
+        
+        # Update user's balance in database
+        current_user.balance = str(current_balance)
+        db.commit()
+        
+        return {
+            "address": current_user.zcash_address,
+            "transparent_address": current_user.zcash_transparent_address,
+            "balance": current_balance,
+            "message": "Balance refreshed successfully"
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/users/me/cashout", response_model=schemas.CashoutResponse)
+def cashout_user_funds(
+    cashout_request: schemas.CashoutRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Send user funds to a specified address"""
+    try:
+        from .zcash_mod import zcash_wallet, zcash_utils
+        
+        # Validate input parameters
+        if cashout_request.amount <= 0:
+            raise HTTPException(status_code=400, detail="No bananas! Cashout amount must be positive")
+        
+        # Validate destination address
+        try:
+            zcash_utils.validate_zcash_address(cashout_request.recipient_address)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Rotten bananas! Invalid recipient address: {str(e)}")
+        
+        # Use the user's primary Zcash address (which should be a Unified Address)
+        # This avoids the "bare receiver" issue by using the full UA
+        sending_address = current_user.zcash_address
+        
+        if not sending_address:
+            raise HTTPException(status_code=400, detail="User has no Zcash address configured")
+        
+        # For Unified Addresses, we check the total balance across all pools
+        # The wallet will automatically choose the best pool for sending
+        current_balance = zcash_wallet.get_user_balance_by_address(sending_address)
+        
+        if current_balance < cashout_request.amount:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Insufficient balance. Available: {current_balance:.8f} ZEC, Requested: {cashout_request.amount:.8f} ZEC"
+            )
+        
+        # Prepare transaction using z_sendmany for shielded sending
+        # Ensure amount is properly formatted (max 8 decimal places for ZEC)
+        formatted_amount = round(cashout_request.amount, 8)
+        
+        if formatted_amount <= 0:
+            raise HTTPException(status_code=400, detail="Amount must be greater than 0")
+        
+        # Check minimum transaction amount (1 zatoshi = 0.00000001 ZEC)
+        min_amount = 0.00000001
+        if formatted_amount < min_amount:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Amount too small. Minimum: {min_amount} ZEC, Provided: {formatted_amount} ZEC"
+            )
+        
+        # Use the formatted amount directly (like zchat does)
+        recipients = [{
+            "address": cashout_request.recipient_address,
+            "amount": formatted_amount
+        }]
+        
+        # Add memo if provided and recipient supports it (shielded address)
+        if cashout_request.memo and cashout_request.recipient_address.startswith('z'):
+            recipients[0]["memo"] = cashout_request.memo
+        
+        # Send the transaction with appropriate privacy policy
+        # Use AllowLinkingAccountAddresses to allow spending from different pools
+        privacy_policy = "AllowLinkingAccountAddresses"
+        
+        # Use minconf=0 for testing (allows unconfirmed funds)
+        # In production, you might want minconf=1 or higher
+        operation_id = zcash_wallet.z_sendmany(
+            from_address=sending_address,
+            recipients=recipients,
+            minconf=1,  # Allow unconfirmed funds for testing
+            privacy_policy=privacy_policy
+        )
+        
+        # Deduct from user's balance (in development mode)
+        zcash_wallet.deduct_user_balance(sending_address, cashout_request.amount)
+        
+        return schemas.CashoutResponse(
+            message="Cashout transaction submitted successfully",
+            transaction_id=operation_id,
+            recipient_address=cashout_request.recipient_address,
+            amount=cashout_request.amount,
+            memo=cashout_request.memo
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error processing cashout: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to process cashout: {str(e)}")
+
+
+@app.get("/api/users/me/operation-status/{operation_id}", response_model=schemas.OperationStatusResponse)
+def get_operation_status(
+    operation_id: str,
+    current_user: models.User = Depends(get_current_user)
+):
+    """Check the status of a Zcash operation (like z_sendmany)"""
+    try:
+        from .zcash_mod import zcash_wallet
+        
+        # Get operation status from Zcash node
+        operations = zcash_wallet.z_getoperationstatus([operation_id])
+        
+        if not operations:
+            raise HTTPException(status_code=404, detail="Operation not found")
+        
+        operation = operations[0]
+        
+        # Parse operation status
+        status = operation.get('status', 'unknown')
+        transaction_id = None
+        error = None
+        
+        if status == 'success' and 'result' in operation:
+            transaction_id = operation['result'].get('txid')
+        elif status == 'failed' and 'error' in operation:
+            error = operation['error'].get('message', 'Unknown error')
+        
+        return schemas.OperationStatusResponse(
+            operation_id=operation_id,
+            status=status,
+            transaction_id=transaction_id,
+            error=error
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error checking operation status: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to check operation status: {str(e)}")
+
+
 @app.get("/api/pool/balance")
 def get_pool_balance(current_user: models.User = Depends(get_current_user)):
     """Get pool balance (admin only for now)"""

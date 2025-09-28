@@ -36,6 +36,27 @@ class Transaction(BaseModel):
     amount: float
 
 
+class CashoutRequest(BaseModel):
+    recipient_address: str
+    amount: float
+    memo: str | None = None
+
+
+class CashoutResponse(BaseModel):
+    message: str
+    transaction_id: str
+    recipient_address: str
+    amount: float
+    memo: str | None = None
+
+
+class OperationStatusResponse(BaseModel):
+    operation_id: str
+    status: str  # "queued", "executing", "success", "failed"
+    transaction_id: str | None = None
+    error: str | None = None
+
+
 # NonProfit summary schema (defined early since it's used in SportEventResponse)
 class NonProfitSummary(BaseModel):
     """Minimal nonprofit info for event responses"""

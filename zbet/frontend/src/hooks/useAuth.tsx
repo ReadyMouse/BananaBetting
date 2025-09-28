@@ -2,7 +2,7 @@
 
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { User, LoginCredentials, UserCreate } from '@/types';
-import { authApi, tokenManager } from '@/lib/api';
+import { authApi, tokenManager, zcashApi } from '@/lib/api';
 
 interface AuthContextType {
   user: User | null;
@@ -10,6 +10,7 @@ interface AuthContextType {
   login: (credentials: LoginCredentials) => Promise<void>;
   register: (userData: UserCreate) => Promise<void>;
   logout: () => void;
+  refreshBalance: () => Promise<void>;
   isAuthenticated: boolean;
 }
 
@@ -81,6 +82,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   };
 
+  const refreshBalance = async () => {
+    try {
+      if (!user) {
+        throw new Error('No user logged in');
+      }
+      
+      const balanceData = await zcashApi.refreshBalance();
+      
+      // Update user with new balance
+      setUser(prevUser => {
+        if (!prevUser) return null;
+        return {
+          ...prevUser,
+          balance: balanceData.balance.toString()
+        };
+      });
+    } catch (error) {
+      console.error('Failed to refresh balance:', error);
+      throw error;
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -89,6 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         register,
         logout,
+        refreshBalance,
         isAuthenticated,
       }}
     >

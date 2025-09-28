@@ -72,6 +72,9 @@ Yes, we see a new balance in test2's account on the blockchain. But does Banana 
 
 ![screenshot of receiving the money in the test2 account](screenshots/profile_receive_funds_test2.png)
 
+Turns out I need more than 0.0001 to play with...adding 0.0166 ZEC or ~$1. 
+
+> Transcation Hash: 56eb59f3f6f01e6d052ebef871234bc06d556c2c7555b728a4b4fd40744788e7
 
 ## Submiting a Charity
 Let's submit a new charity as well as it's zcash addresses. We ask for both transparent and sheilded addreses so that if people want to make donations in either one that is an option. All betting distributions will be made to the transaparent address. We do not create custodial accounts for the non-profits, they get the distributions automatically.
@@ -163,6 +166,12 @@ The event is processed in a single transcation.
 
 ![Screenshots of a user cashing out their balance](screenshots/cash_out_user.png)
 
->**Private Operation ID**::opid-40d9d9f4-1bad-487a-95fa-3ded1d6495c4
+![Screenshots of the transcation hashses](screenshots/success_cashout_BB.png)
 
-curl -X GET "http://localhost:8000/api/users/me/operation-status/opid-2bb8c833-8a30-40b5-bfdb-39785d3f2ef4" -H "Authorization: Bearer YOUR_TOKEN_HERE" -H "Content-Type: application/json"
+![Screenshots of my Zashi wallet with the new transcation](screenshots/zashi_recieved_cashout.png)
+
+**Private Operation ID**::opid-11e9f74d-0b54-4911-8598-fe5dcf34e495
+
+>**Private Transcation Has** :: 45e70589736d4a9bd6045a3dc1c9320d5f3483d002872e6da55a3756b50d29d0
+
+![Screenshot of blockexplorer](screenshots/cashout_block_explorer.png)
