@@ -22,6 +22,14 @@ import { useAuth } from '@/hooks/useAuth';
 import { cn, formatZcash, getRandomBananaEmoji } from '@/lib/utils';
 import Disclaimer from '@/components/Disclaimer';
 
+type Transaction = {
+  id: string;
+  description: string;
+  date: string;
+  type: 'win' | 'loss';
+  amount: number;
+};
+
 export default function ProfilePage() {
   const { user, logout } = useAuth();
   const router = useRouter();
@@ -44,11 +52,7 @@ export default function ProfilePage() {
     transparentAddress: user?.zcash_transparent_address || 'Not available',
     balance: parseFloat(user?.balance || '0'),
     isConnected: !!user?.zcash_address,
-    transactions: [
-      { id: '1', type: 'win', amount: 0.05, date: '2024-01-15', description: 'Banana throw bet - WON!' },
-      { id: '2', type: 'bet', amount: -0.02, date: '2024-01-14', description: 'Fan costume bet' },
-      { id: '3', type: 'win', amount: 0.08, date: '2024-01-12', description: 'Home run dance bet - WON!' },
-    ]
+    transactions: [] as Transaction[]
   };
 
   const [settings, setSettings] = useState({
@@ -254,12 +258,6 @@ export default function ProfilePage() {
                       )}
                     </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-baseball-700 mb-2">
-                        Member Since
-                      </label>
-                      <p className="text-lg text-baseball-800">January 2024 🎉</p>
-                    </div>
                   </div>
                 </div>
               )}
@@ -293,8 +291,8 @@ export default function ProfilePage() {
                         Shielded Address (Private)
                       </label>
                       <div className="flex items-center space-x-2">
-                        <div className="flex-1 px-4 py-3 bg-gray-50 border border-banana-300 rounded-lg">
-                          <p className="font-mono text-sm text-gray-800">
+                        <div className="flex-1 px-4 py-3 bg-gray-50 border border-banana-300 rounded-lg overflow-x-auto min-w-0 w-0">
+                          <p className="font-mono text-sm text-gray-800 whitespace-nowrap">
                             {showAddress ? walletData.shieldedAddress : '••••••••••••••••••••••••••••••••••••'}
                           </p>
                         </div>
@@ -319,8 +317,8 @@ export default function ProfilePage() {
                         Transparent Address (Public)
                       </label>
                       <div className="flex items-center space-x-2">
-                        <div className="flex-1 px-4 py-3 bg-gray-50 border border-banana-300 rounded-lg">
-                          <p className="font-mono text-sm text-gray-800">
+                        <div className="flex-1 px-4 py-3 bg-gray-50 border border-banana-300 rounded-lg overflow-x-auto min-w-0 w-0">
+                          <p className="font-mono text-sm text-gray-800 whitespace-nowrap">
                             {showAddress ? walletData.transparentAddress : '••••••••••••••••••••••••••••••••••••'}
                           </p>
                         </div>
@@ -370,20 +368,26 @@ export default function ProfilePage() {
                   <div>
                     <h3 className="text-lg font-bold text-baseball-800 mb-4">Recent Transactions</h3>
                     <div className="space-y-3">
-                      {walletData.transactions.map((tx) => (
-                        <div key={tx.id} className="flex items-center justify-between p-4 bg-banana-50 border border-banana-200 rounded-lg">
-                          <div>
-                            <p className="font-medium text-baseball-800">{tx.description}</p>
-                            <p className="text-sm text-baseball-600">{tx.date}</p>
+                      {walletData.transactions.length > 0 ? (
+                        walletData.transactions.map((tx) => (
+                          <div key={tx.id} className="flex items-center justify-between p-4 bg-banana-50 border border-banana-200 rounded-lg">
+                            <div>
+                              <p className="font-medium text-baseball-800">{tx.description}</p>
+                              <p className="text-sm text-baseball-600">{tx.date}</p>
+                            </div>
+                            <div className={cn(
+                              'font-bold',
+                              tx.type === 'win' ? 'text-grass-600' : 'text-red-600'
+                            )}>
+                              {tx.type === 'win' ? '+' : ''}{formatZcash(tx.amount)}
+                            </div>
                           </div>
-                          <div className={cn(
-                            'font-bold',
-                            tx.type === 'win' ? 'text-grass-600' : 'text-red-600'
-                          )}>
-                            {tx.type === 'win' ? '+' : ''}{formatZcash(tx.amount)}
-                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center p-8 bg-banana-50 border border-banana-200 rounded-lg">
+                          <p className="text-baseball-600 italic">No transactions yet. Start betting to see your transaction history! 🍌</p>
                         </div>
-                      ))}
+                      )}
                     </div>
                   </div>
                 </div>

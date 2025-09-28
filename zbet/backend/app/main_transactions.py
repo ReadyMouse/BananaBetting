@@ -7,7 +7,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from typing import List
 
 from . import auth, crud, models, schemas
-from .database import SessionLocal, engine
+from .database import SessionLocal, engine, get_db
 from .zcash_mod import zcash_wallet, zcash_utils
 
 # Create database tables
@@ -155,6 +155,27 @@ def get_balance(current_user: models.User = Depends(get_current_user)):
             "balance": balance
         }
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/zcash/refresh-balance/")
+def refresh_balance(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Refresh user's balance from the Zcash node and update database"""
+    try:
+        # Get current balance from Zcash node
+        current_balance = zcash_wallet.get_transparent_address_balance(current_user.zcash_transparent_address)
+        
+        # Update user's balance in database
+        current_user.balance = str(current_balance)
+        db.commit()
+        
+        return {
+            "address": current_user.zcash_address,
+            "transparent_address": current_user.zcash_transparent_address,
+            "balance": current_balance,
+            "message": "Balance refreshed successfully"
+        }
+    except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/zcash/address/")

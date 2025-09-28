@@ -53,10 +53,19 @@ def z_get_new_account():
 
         # Parse response
         validation_data = response.json()
+        
+        # Check for RPC errors in the response
+        if validation_data.get('error'):
+            error_msg = validation_data['error'].get('message', 'Unknown RPC error')
+            print(f"Zcash RPC Error: {error_msg}")
+            raise HTTPException(status_code=500, detail=f"Zcash RPC Error: {error_msg}")
+        
         return validation_data['result']['account']
     
+    except HTTPException:
+        raise
     except Exception as e:
-        print('Here')
+        print(f'Unexpected error: {e}')
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -113,7 +122,11 @@ def get_transparent_address_balance(address: str):
 
         # Parse response
         validation_data = response.json()
-        return validation_data['result']['balance']
+        balance_zatoshis = validation_data['result']['balance']
+        
+        # Convert zatoshis to ZEC (1 ZEC = 100,000,000 zatoshis)
+        balance_zec = balance_zatoshis / 100000000.0
+        return balance_zec
     
     except Exception as e:
         print('Here')

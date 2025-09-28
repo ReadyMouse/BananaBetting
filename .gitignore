@@ -130,6 +130,7 @@ dmypy.json
 .DS_Store
 .AppleDouble
 .LSOverride
+.~lock.graphics.odp#
 
 # Icon must end with two \r
 Icon
@@ -196,9 +197,6 @@ alembic.ini
 # Code for reference
 zchat*
 zchat/backend/venv/ # Virtual environment (already covered above but being explicit)
-
-# screenshots
-screenshots/*
 
 # Vercel Serverless Functions
 .vercel

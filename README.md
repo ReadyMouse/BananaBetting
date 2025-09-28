@@ -1,12 +1,17 @@
 # 🍌 BananaBetting - Hackathon Sports Betting App for Charity
 
-Inspired by the Savanah Bannanas and Banana-ball, the dancing alternative to baseball. BananaBetting is a fun, Zcash-powered sports betting platform, all to benefit charities. Sports betting for the rest of us.
+Inspired by the Savanah Bannanas and Banana-ball, the dancing alternative to baseball. BananaBetting is a fun, Zcash-powered sports betting platform, all to benefit charities. Sports betting for the rest of us. Find Screenshots and Demostrations at [DEMO.md](DEMO.md)
 
 Ready Mouse zcash address: u18k2wk6dk9qarekd03v8qgy29qhxp9jag6mmkvvspwrszp0sd48mv043nsfha8vx763432x2gymnu7pvzku6n6ptve5tlvfa7wgq9vf6vzwkt7q3wweju3th2y3ldkjxdst78hlww38en64zljse55gz37s2dkxxqn8p0q3xxf5jj9rqk
+
+**⚠️ IMPORTANT DISCLAIMER ⚠️**
+
+This project was created for the [**2025 ZecHub Hackathon**](https://hackathon.zechub.wiki/) and is intended **ONLY** for educational purposes, blockchain functionality testing, and hackathon demonstration.
 
 ## 🎯 Project Overview
 
 **BananaBetting** transforms traditional fundraising and charity donations into an interactive, sports betting experience:
+![Overview of the system graphic](screenshots/ov1_graphic.png)
 
 - **Charities** -> Join our database of crypto-accepting 503(c) Non-profits
 - **Organizations** + Influencers -> Create events to bet on
@@ -33,9 +38,17 @@ Ready Mouse zcash address: u18k2wk6dk9qarekd03v8qgy29qhxp9jag6mmkvvspwrszp0sd48m
 - **Zcash Node**: Running Zcash daemon with RPC enabled
 - **Git**
 
-
-
 ## 🚀 Quick Start
+
+### 0. Have a Zcash Node Running
+This functional demostation used zcashd for server operations. 
+- [General docs for running nodes](https://github.com/zecrocks/zcash-stack)
+- [Example zcashd docker compose file](https://github.com/fabacab/zcash-stack/blob/35b14dc847f5af8c889ad257c1749efcf123fde2/docker/compose.zcashd.yaml) 
+- [Pending PR to zcash-stack](https://github.com/fabacab/zcash-stack/commit/35b14dc847f5af8c889ad257c1749efcf123fde2)
+
+Ensure your `zcashd` node is configured with JSON RPC access, including `disable-wallet=0` and synchronized before using the transaction features. This may require turning on `--exportdir` to save out the recovery keys of the wallet features in the node. This can be turned off once the keys have been saved, and the acknowledgement of the keys is complete. 
+
+Note: Lightwallets (ligthwalletd, zebrad) do not allow the wallet account features needed for this betting system. At the time of writing, Zaino was not ready for production. 
 
 ### 1. Clone the Repository
 
@@ -44,10 +57,7 @@ git clone git@github.com:ReadyMouse/BananaBetting.git
 cd BananaBetting
 ```
 ### 2. Update configs
-
-⚙️ Zcash Node Configuration
-
-Ensure your Zcash node is configured with RPC access. Update the credentials in:
+Update the credentials in:
 `zbet/backend/app/zcash_mod/__init__.py`
 
 ```python
@@ -58,7 +68,6 @@ ZCASH_RPC_URL = "http://127.0.0.1:8232/"
 
 Set pool and house addresses: 
 `zbet/backend/.env`
-
 
 ### 3. Launch the API
 
@@ -215,21 +224,13 @@ BananaBetting/
 └── README.md                   # This file
 ```
 
-## 🛡️ Security Notes
-
-- Change the JWT secret key in production (`auth.py`)
-- Use zbet/backend/.env environment variables for sensitive configuration
-- Ensure Zcash node RPC is properly secured
-- Use HTTPS in production environments
-- Regularly update dependencies
-
 ## 📄 License
 
 This project is a proof-of-concept for development purposes. It leveraged some functions from 2024 Hackathon project: zchat.
 
 **⚠️ IMPORTANT DISCLAIMER ⚠️**
 
-This project was created for the **2025 ZecHub Hackathon** (https://hackathon.zechub.wiki/) and is intended **ONLY** for educational purposes, blockchain functionality testing, and hackathon demonstration.
+This project was created for the [**2025 ZecHub Hackathon**](https://hackathon.zechub.wiki/) and is intended **ONLY** for educational purposes, blockchain functionality testing, and hackathon demonstration.
 
 **🚨 DO NOT USE IN PRODUCTION 🚨**
 
@@ -240,5 +241,5 @@ This project was created for the **2025 ZecHub Hackathon** (https://hackathon.ze
 - Users are solely responsible for ensuring compliance with their local laws and regulations
 - Since wining bets are refunded and loser bets are resdistributed to charitires, this is potentially not under gambling restrictions
 
-**Technical Note**: This API requires a running Zcash node with RPC enabled. Ensure your node is properly configured and synchronized before using the transaction features.
+
 
