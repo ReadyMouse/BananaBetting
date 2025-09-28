@@ -11,6 +11,7 @@ This project was created for the [**2025 ZecHub Hackathon**](https://hackathon.z
 ## 🎯 Project Overview
 
 **BananaBetting** transforms traditional fundraising and charity donations into an interactive, sports betting experience:
+
 ![Overview of the system graphic](screenshots/ov1_graphic.png)
 
 - **Charities** -> Join our database of crypto-accepting 503(c) Non-profits

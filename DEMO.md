@@ -48,12 +48,12 @@ Results:
 ```bash
 {"result":{"isvalid":true,"address":"u1yvde4d53qp5wnhm843nxj3ayu8ev8l3fmna8yqkzk9weczw3q2fucf8yrtugqtdacjrjvvracszcy0ggesc7jrtklecv3rjeqtsjh453eqte8s486zksg3k5m44g03mdwqnlra8cexyh0xky5xw4x9yj065rvwan4zd64cjn622nthl90halsttvd7d09k7n8pfcjue356rhuzvglea","address_type":"unified"},"error":null,"id":"curltest"}
 ```
-Success, a use with an account with real addresses. 
+Success, a user with an account with real addresses. 
 
 ## Adding ZEC to the account 
 Let's add some ZEC to test2. From my personal Zashi account, let's send to test2. 
 
-**Evidence**::Transaction hash ID::425fdebbe283a5231fa422354cdafae316f5ee3bed926d4619cb5af11f6cb60e
+> **Transaction hash:** 425fdebbe283a5231fa422354cdafae316f5ee3bed926d4619cb5af11f6cb60e
 
 ![Screenshot of sending the money](screenshots/adding_ZEC_blockexplorer_test2.png)
 
@@ -74,7 +74,7 @@ Yes, we see a new balance in test2's account on the blockchain. But does Banana 
 
 
 ## Submiting a Charity
-Let's submit a new charity as well as it's zcash addresses. We ask for both transparent and sheilded addreses so that if people want to make donations in either one that is an option. All betting distributions will be made to the transaparent address.
+Let's submit a new charity as well as it's zcash addresses. We ask for both transparent and sheilded addreses so that if people want to make donations in either one that is an option. All betting distributions will be made to the transaparent address. We do not create custodial accounts for the non-profits, they get the distributions automatically.
 
 ![Screenshot of making a Charity](screenshots/add_nonprofit.png)
 
@@ -125,4 +125,8 @@ Then we can see results of other validators.
 The event is processed in a single transcation. 
 
 **Evidence**::Transparent Transaction hash ID::[TBD]
+
+## Cashing out Balances
+
+![Screenshots of a user cashing out their balance]
 
