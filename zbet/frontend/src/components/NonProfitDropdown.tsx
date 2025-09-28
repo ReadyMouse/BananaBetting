@@ -97,13 +97,17 @@ export default function NonProfitDropdown({
 
   const selectedNonProfit = nonprofits.find(np => np.id === selectedNonProfitId);
 
-  const handleSelect = (nonprofit: NonProfit) => {
+  const handleSelect = (e: React.MouseEvent, nonprofit: NonProfit) => {
+    e.preventDefault();
+    e.stopPropagation();
     onSelect(nonprofit.id);
     setIsOpen(false);
     setSearchTerm('');
   };
 
-  const handleInputClick = () => {
+  const handleInputClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     setIsOpen(true);
     if (inputRef.current) {
       inputRef.current.focus();
@@ -117,7 +121,9 @@ export default function NonProfitDropdown({
     } else if (e.key === 'Enter') {
       e.preventDefault();
       if (filteredNonProfits.length === 1) {
-        handleSelect(filteredNonProfits[0]);
+        // Create a synthetic mouse event for handleSelect
+        const syntheticEvent = e as any;
+        handleSelect(syntheticEvent, filteredNonProfits[0]);
       }
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
@@ -154,6 +160,7 @@ export default function NonProfitDropdown({
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   onKeyDown={handleKeyDown}
+                  onClick={(e) => e.stopPropagation()}
                   placeholder={selectedNonProfit ? selectedNonProfit.name : placeholder}
                   className="w-full bg-transparent border-none outline-none text-gray-900 placeholder-gray-500"
                 />
@@ -230,7 +237,8 @@ export default function NonProfitDropdown({
                   {filteredNonProfits.map((nonprofit) => (
                     <motion.button
                       key={nonprofit.id}
-                      onClick={() => handleSelect(nonprofit)}
+                      type="button"
+                      onClick={(e) => handleSelect(e, nonprofit)}
                       whileHover={{ backgroundColor: '#fef3c7' }}
                       className="w-full px-4 py-3 text-left hover:bg-banana-50 transition-colors border-none bg-transparent cursor-pointer group"
                     >

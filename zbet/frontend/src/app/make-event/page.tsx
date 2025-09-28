@@ -508,6 +508,12 @@ export default function MakeEventPage() {
                   type="datetime-local"
                   value={formData.event_start_time}
                   onChange={(e) => handleInputChange('event_start_time', e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                    }
+                  }}
+                  onClick={(e) => e.stopPropagation()}
                   className="w-full px-4 py-3 border border-banana-300 rounded-lg focus:ring-2 focus:ring-banana-500 focus:border-banana-500 transition-colors text-gray-900"
                 />
                 <p className="text-sm text-baseball-600 mt-1">When the actual event begins (Eastern Time)</p>
@@ -522,6 +528,12 @@ export default function MakeEventPage() {
                   type="datetime-local"
                   value={formData.event_end_time}
                   onChange={(e) => handleInputChange('event_end_time', e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                    }
+                  }}
+                  onClick={(e) => e.stopPropagation()}
                   className="w-full px-4 py-3 border border-banana-300 rounded-lg focus:ring-2 focus:ring-banana-500 focus:border-banana-500 transition-colors text-gray-900"
                 />
                 <p className="text-sm text-baseball-600 mt-1">When the actual event ends (Eastern Time)</p>
@@ -536,6 +548,12 @@ export default function MakeEventPage() {
                   type="datetime-local"
                   value={formData.settlement_time}
                   onChange={(e) => handleInputChange('settlement_time', e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                    }
+                  }}
+                  onClick={(e) => e.stopPropagation()}
                   className="w-full px-4 py-3 border border-banana-300 rounded-lg focus:ring-2 focus:ring-banana-500 focus:border-banana-500 transition-colors text-gray-900"
                 />
                 <p className="text-sm text-baseball-600 mt-1">When the event outcome must be determined and payouts processed (Eastern Time)</p>

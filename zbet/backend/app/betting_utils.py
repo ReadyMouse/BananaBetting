@@ -76,7 +76,6 @@ def validate_bet_for_event(sport_event: models.SportEvent, predicted_outcome: st
     # Check user balance if db and user_id are provided
     if db is not None and user_id is not None:
         from .zcash_mod import zcash_wallet
-        from . import models
         
         # Get user to check balance
         user = db.query(models.User).filter(models.User.id == user_id).first()

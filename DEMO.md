@@ -48,6 +48,7 @@ Results:
 ```bash
 {"result":{"isvalid":true,"address":"u1yvde4d53qp5wnhm843nxj3ayu8ev8l3fmna8yqkzk9weczw3q2fucf8yrtugqtdacjrjvvracszcy0ggesc7jrtklecv3rjeqtsjh453eqte8s486zksg3k5m44g03mdwqnlra8cexyh0xky5xw4x9yj065rvwan4zd64cjn622nthl90halsttvd7d09k7n8pfcjue356rhuzvglea","address_type":"unified"},"error":null,"id":"curltest"}
 ```
+Success, a use with an account with real addresses. 
 
 ## Adding ZEC to the account 
 Let's add some ZEC to test2. From my personal Zashi account, let's send to test2. 
@@ -59,7 +60,7 @@ Let's add some ZEC to test2. From my personal Zashi account, let's send to test2
 But did we get it back in Banana Betting test2 account?
 
 ```bash
-curl --user rpcuser:vJaRlZ47H1DhYw --data-binary '{"jsonrpc": "1.0", "id":"curltest", "method": "getaddressbalance", "params": [{"addresses": ["t1SJNuLP4V2FxEMTsvcbchEqy77EfyDypfb"]}] }' -H 'content-type: text/plain;' http://84.32.151.95:8232/
+curl --user rpcuser:password --data-binary '{"jsonrpc": "1.0", "id":"curltest", "method": "getaddressbalance", "params": [{"addresses": ["t1SJNuLP4V2FxEMTsvcbchEqy77EfyDypfb"]}] }' -H 'content-type: text/plain;' http://84.32.151.95:8232/
 ```
 
 Results: 
@@ -67,6 +68,7 @@ Results:
 ```
 {"result":{"balance":10000,"received":10000},"error":null,"id":"curltest"}
 ```
+Yes, we see a new balance in test2's account on the blockchain. But does Banana betting see it? 
 
 ![screenshot of receiving the money in the test2 account](screenshots/profile_receive_funds_test2.png)
 
@@ -103,10 +105,14 @@ If a user tries to make a bet but they don't have enough in their wallet to cove
 **Evidence**::Transparent Transaction hash ID::[TBD] (can we make this private but with viewing keys?)
 
 ## Validating the Outcome of Other Events 
+Let's vote on the outcome of an event that we didn't bet in. 
 
-![Screenshot of the validation page]
+![Screenshot of the validation page](screenshots/validate_event.png)
 
-![Screenshot of the post-submission validation page]
+Then we can see results of other validators. 
+
+![Screenshot of the post-submission validation page](screenshots/event_closed.png)
+![screenshots of the post-submission validation page 2](screenshots/event_validation_results.png)
 
 ## [Admin] Settling the Bets + Preview of Payouts 
 
