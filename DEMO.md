@@ -90,19 +90,52 @@ Take a look at the form for making a new betting event.
 
 ![Screenshot of making a betting event](screenshots/make_event2.png)
 
-![Screenshot of the database with betting event]
+![Screenshot of the database with betting event](screenshots/find_bets.png)
 
 ## Placing Bets
-
-![Screenshot of placing a bet: successful]
-
 If a user tries to make a bet but they don't have enough in their wallet to cover their bets:
 
 ![Screenshot of placing a bet: not enough balance](screenshots/low_balance_bet_error.png)
 
-![Screensht of reduced user wallet balance]
+If they have enough ZEC in their account to cover the bet: 
 
-**Evidence**::Transparent Transaction hash ID::[TBD] (can we make this private but with viewing keys?)
+![Screenshot of placing a bet: successful]
+
+Now the bet will be transferred to the pool account, where all funds in limbo are held until the betting event is over. This transcation is private, as bets should be a secret. 
+
+**Evidence**::Transaction hash ID::[TBD]
+
+![Screenshot of the transcation has on the blockchain]
+
+Do we see test2's balance deducted? 
+
+```bash
+curl --user rpcuser:password --data-binary '{"jsonrpc": "1.0", "id":"curltest", "method": "getaddressbalance", "params": [{"addresses": ["t1SJNuLP4V2FxEMTsvcbchEqy77EfyDypfb"]}] }' -H 'content-type: text/plain;' http://84.32.151.95:8232/
+```
+
+Results: 
+
+```
+[TODO]
+```
+
+Great, test2 placed their bets.
+
+![Screenshot of reduced user wallet balance]
+
+Do we see the pool's balance increased? 
+
+```bash
+curl --user rpcuser:password --data-binary '{"jsonrpc": "1.0", "id":"curltest", "method": "getaddressbalance", "params": [{"addresses": ["t1SJNuLP4V2FxEMTsvcbchEqy77EfyDypfb"]}] }' -H 'content-type: text/plain;' http://84.32.151.95:8232/
+```
+
+Results: 
+
+```
+[TODO]
+```
+
+Great, we have made a private bet on the outcome of the event with the amount deduced from the bettor's account and added to the pool address.
 
 ## Validating the Outcome of Other Events 
 Let's vote on the outcome of an event that we didn't bet in. 
@@ -128,5 +161,8 @@ The event is processed in a single transcation.
 
 ## Cashing out Balances
 
-![Screenshots of a user cashing out their balance]
+![Screenshots of a user cashing out their balance](screenshots/cash_out_user.png)
 
+>**Private Operation ID**::opid-40d9d9f4-1bad-487a-95fa-3ded1d6495c4
+
+curl -X GET "http://localhost:8000/api/users/me/operation-status/opid-2bb8c833-8a30-40b5-bfdb-39785d3f2ef4" -H "Authorization: Bearer YOUR_TOKEN_HERE" -H "Content-Type: application/json"
