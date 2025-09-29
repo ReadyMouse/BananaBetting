@@ -1270,7 +1270,7 @@ def send_event_payouts(
             ) for p in pending_payouts
         ]
         
-        # Send the batch payout transaction
+        # Send the batch payout transaction (only for external addresses)
         pool_address = settings.get_pool_address()
         transaction_id = betting_utils._send_batch_payouts(pool_address, payout_records)
         
@@ -1280,13 +1280,14 @@ def send_event_payouts(
             payout.is_processed = True
             payout.zcash_transaction_id = transaction_id
             
-            # Add payout to user balance (only for user winnings, not fees)
-            if payout.user_id and payout.payout_type == "user_winning":
+            # Add payout to user balance for ALL internal payouts 
+            if payout.user_id and payout.payout_type in ["user_winning", "creator_fee", "validator_fee"]:
                 user = db.query(models.User).filter(models.User.id == payout.user_id).first()
                 if user:
                     user_address = user.zcash_transparent_address or user.zcash_address
                     if user_address:
                         zcash_wallet.add_user_balance(user_address, payout.payout_amount)
+                        print(f"Added {payout.payout_amount} ZEC to {user.username} balance ({payout.payout_type})")
         
         db.commit()
         

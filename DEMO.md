@@ -124,43 +124,13 @@ If a user tries to make a bet but they don't have enough in their wallet to cove
 
 If they have enough ZEC in their account to cover the bet: 
 
-![Screenshot of placing a bet: successful]
+![Screenshot of placing a bet: successful](screenshots/placed_bets_page.png)
 
-Now the bet will be transferred to the pool account, where all funds in limbo are held until the betting event is over. This transcation is private, as bets should be a secret. 
+Now the bet is recorded in the database, since all funds at in the shielded pool to start, this bet doesn't require a blockchain transaction. We just see it in the updated wallet balance.
 
-**Evidence**::Transaction hash ID::[TBD]
+![screenshot of new wallet balance](screenshots/post_bet_wallet_balance.png)
 
-![Screenshot of the transcation has on the blockchain]
-
-Do we see test2's balance deducted? 
-
-```bash
-curl --user rpcuser:password --data-binary '{"jsonrpc": "1.0", "id":"curltest", "method": "getaddressbalance", "params": [{"addresses": ["t1SJNuLP4V2FxEMTsvcbchEqy77EfyDypfb"]}] }' -H 'content-type: text/plain;' http://84.32.151.95:8232/
-```
-
-Results: 
-
-```
-[TODO]
-```
-
-Great, test2 placed their bets.
-
-![Screenshot of reduced user wallet balance]
-
-Do we see the pool's balance increased? 
-
-```bash
-curl --user rpcuser:password --data-binary '{"jsonrpc": "1.0", "id":"curltest", "method": "getaddressbalance", "params": [{"addresses": ["t1SJNuLP4V2FxEMTsvcbchEqy77EfyDypfb"]}] }' -H 'content-type: text/plain;' http://84.32.151.95:8232/
-```
-
-Results: 
-
-```
-[TODO]
-```
-
-Great, we have made a private bet on the outcome of the event with the amount deduced from the bettor's account and added to the pool address.
+Great, we have made a private bet (not on the blockchain) on the outcome of the event with the amount deduced from the bettor's account and added to the pool address.
 
 ## Validating the Outcome of Other Events 
 Let's vote on the outcome of an event that we didn't bet in. 
@@ -180,9 +150,29 @@ Then we can see results of other validators.
 
 ## [Admin] Payouts
 
-The event is processed in a single transcation. 
+Now that the event is settled, and the consensus reached it's time to payout the winners. In a real system, this would be automated. In this hackathon system, I have to push the buttons. The event is processed in a single, z_sendmany transcation.
 
-**Evidence**::Transparent Transaction hash ID::[TBD]
+(Yes, you can see some mock addresses for my fake validators. It's not a problem.)
+
+![screenshot of the payout receipt](screenshots/payout_reciept_1.png)
+![screenshot of the payout receipt](screenshots/payout_reciept_2.png)
+![screenshot of the payout receipt](screenshots/payout_reciept_3.png)
+
+Success! We paid out the betting event. 
+
+![screenshot of the payout success and OPID](screenshots/payout_success_OPID.png)
+
+Going from OPID to transcation hash:
+
+>Transaction hash ID::b51575a20aba5ac028aef1869d8a1143e84fcb311bdc03afe9071d2c320cd4fd
+
+![screenshot of blockexplorer](screenshots/payout_success_blockexplorer.png)
+
+Checking "The House"'s Zashi account 
+
+![screenshot of my transaction in Zashi](screenshots/payout_house_zashi.png)
+
+Wait a minute...why are there only 2 blockchain transcations (1 private, 1 public) if we really have 7? Since this is a custodial situation, the Event Creator and Validators get the money deposited into their Banana Betting accounts. This is an internal database update, and not a blockchain transaction. They would need to cash out their balance from Banana Betting's wallet to their own self-custody wallet. 
 
 ## Cashing out Balances
 

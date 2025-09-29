@@ -78,7 +78,9 @@ export default function ProfilePage() {
   const walletData = {
     shieldedAddress: user?.zcash_address || 'Not available',
     transparentAddress: user?.zcash_transparent_address || 'Not available',
-    balance: parseFloat(user?.balance || '0'),
+    balance: user?.transparent_balance != null && user?.shielded_balance != null 
+      ? user.transparent_balance + user.shielded_balance 
+      : parseFloat(user?.balance || '0'),
     isConnected: !!user?.zcash_address,
     transactions: [] as Transaction[]
   };

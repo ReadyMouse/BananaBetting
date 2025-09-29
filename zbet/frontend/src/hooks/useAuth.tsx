@@ -42,6 +42,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (isValid) {
           const userData = await authApi.getMe();
           setUser(userData);
+          
+          // Automatically refresh balance data to ensure accurate information
+          try {
+            const balanceSummary = await zcashApi.getBalanceSummary();
+            setUser(prevUser => {
+              if (!prevUser) return userData;
+              return {
+                ...prevUser,
+                balance: balanceSummary.total_balance.toString(),
+                transparent_balance: balanceSummary.transparent_balance,
+                shielded_balance: balanceSummary.shielded_balance,
+                last_balance_update: balanceSummary.last_balance_update,
+                balance_version: balanceSummary.balance_version
+              };
+            });
+          } catch (balanceError) {
+            console.warn('Failed to load balance summary on auth check:', balanceError);
+            // Continue with basic user data if balance fetch fails
+          }
         } else {
           tokenManager.removeToken();
         }
@@ -60,6 +79,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       tokenManager.setToken(authData.access_token);
       const userData = await authApi.getMe();
       setUser(userData);
+      
+      // Automatically refresh balance data after login to ensure accurate information
+      try {
+        const balanceSummary = await zcashApi.getBalanceSummary();
+        setUser(prevUser => {
+          if (!prevUser) return userData;
+          return {
+            ...prevUser,
+            balance: balanceSummary.total_balance.toString(),
+            transparent_balance: balanceSummary.transparent_balance,
+            shielded_balance: balanceSummary.shielded_balance,
+            last_balance_update: balanceSummary.last_balance_update,
+            balance_version: balanceSummary.balance_version
+          };
+        });
+      } catch (balanceError) {
+        console.warn('Failed to load balance summary after login:', balanceError);
+        // Continue with basic user data if balance fetch fails
+      }
     } catch (error) {
       console.error('Login failed:', error);
       throw error;

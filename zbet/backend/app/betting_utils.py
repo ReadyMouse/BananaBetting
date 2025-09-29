@@ -591,16 +591,39 @@ def _process_event_payouts(db: Session, sport_event: models.SportEvent, winning_
 
 def _send_batch_payouts(pool_address: str, payout_records: List[schemas.PayoutRecord]) -> str:
     """
-    Send batch payouts using Zcash z_sendmany.
+    Send batch payouts using Zcash z_sendmany - ONLY FOR EXTERNAL ADDRESSES.
     
-    Returns the transaction operation ID.
+    Internal user payouts (user_winning, creator_fee, validator_fee) are handled 
+    as database balance updates, not blockchain transactions.
+    
+    Only external payouts (house_fee, charity_fee) are sent via blockchain.
+    
+    Returns the transaction operation ID for external transactions.
     """
     if not payout_records:
         raise HTTPException(status_code=400, detail="No payouts to process")
     
-    # Build recipients list, consolidating multiple payouts to same address
-    address_amounts = {}
+    # Separate external vs internal payouts
+    external_payouts = []
+    internal_payouts = []
+    
     for record in payout_records:
+        if record.payout_type in ["house_fee", "charity_fee"]:
+            external_payouts.append(record)
+        else:
+            # user_winning, creator_fee, validator_fee are internal
+            internal_payouts.append(record)
+    
+    print(f"Processing {len(external_payouts)} external payouts, {len(internal_payouts)} internal payouts")
+    
+    # Only send blockchain transactions for external payouts
+    if not external_payouts:
+        print("No external payouts to send via blockchain")
+        return "INTERNAL_ONLY_NO_BLOCKCHAIN_TXN"
+    
+    # Build recipients list for external payouts only
+    address_amounts = {}
+    for record in external_payouts:
         if record.recipient_address in address_amounts:
             address_amounts[record.recipient_address] += record.payout_amount
         else:
@@ -614,18 +637,26 @@ def _send_batch_payouts(pool_address: str, payout_records: List[schemas.PayoutRe
     ]
     
     if not recipients:
-        raise HTTPException(status_code=400, detail="No valid recipients for payout")
+        print("No valid external recipients for blockchain payout")
+        return "INTERNAL_ONLY_NO_BLOCKCHAIN_TXN"
     
-    # Send the batch transaction
+    print(f"Sending blockchain transaction to {len(recipients)} external recipients")
+    
+    # Send the batch transaction for external payouts only
     try:
+        # Use Account 2's actual address which contains the funds (0.01634 ZEC in orchard pool)
+        account_2_address = "u1vgarhu7gg0q8cyhqwthqnz3ng0sew0h4e4l7p4nfgxeavpypg2zdtteffs0ddd529fykjvqltn8kv304l2apgyg4l9fst3p0awr02zaxxsz9n24658p9zl2unkhayp8usdl7jhm6tgn0vxz74a2zvksdz0cfxcdj8nl68h6ydwwzyep0rka7jexje9f5sf2tcl0nw9uvx3ljqlx7twd"
         operation_id = zcash_wallet.z_sendmany(
-            from_address=pool_address,
+            from_address=account_2_address,  # Use Account 2's actual address where the funds are
             recipients=recipients,
-            minconf=1
+            minconf=1,
+            fee=None,
+            privacy_policy="AllowFullyTransparent"  # Most permissive - allows transparent recipients AND linking addresses
         )
+        print(f"External blockchain transaction sent with OPID: {operation_id}")
         return operation_id
     except Exception as e:
         raise HTTPException(
             status_code=500, 
-            detail=f"Failed to send batch payout transaction: {str(e)}"
+            detail=f"Failed to send external payout transaction: {str(e)}"
         )
