@@ -105,8 +105,22 @@ def login_for_access_token(db: Session = Depends(get_db),form_data: OAuth2Passwo
     return {"access_token": access_token, "token_type": "bearer"}
 
 @app.get("/users/me/", response_model=schemas.User)
-def read_users_me(current_user: schemas.UserCreate = Depends(get_current_user)):
-    return current_user
+def read_users_me(current_user: models.User = Depends(get_current_user)):
+    """Get current user information"""
+    return schemas.User(
+        id=current_user.id,
+        email=current_user.email,
+        username=current_user.username,
+        is_active=current_user.is_active,
+        zcash_account=current_user.zcash_account or "",
+        zcash_address=current_user.zcash_address or "",
+        zcash_transparent_address=current_user.zcash_transparent_address or "",
+        balance=current_user.balance or "0",
+        shielded_balance=current_user.shielded_balance,
+        transparent_balance=current_user.transparent_balance,
+        last_balance_update=current_user.last_balance_update.isoformat() if current_user.last_balance_update else None,
+        balance_version=current_user.balance_version
+    )
 
 @app.post("/register/", response_model=schemas.User)
 def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
@@ -647,6 +661,117 @@ def get_operation_status(
     except Exception as e:
         print(f"Error checking operation status: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to check operation status: {str(e)}")
+
+
+@app.post("/api/admin/update-transaction-fee/{operation_id}")
+def update_transaction_fee_from_operation(
+    operation_id: str,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Update transaction fee from completed operation (admin function)"""
+    try:
+        from .zcash_mod import zcash_wallet
+        from .transaction_service import TransactionService
+        
+        # Find transaction by operation ID
+        transaction = db.query(models.UserTransaction).filter(
+            models.UserTransaction.operation_id == operation_id
+        ).first()
+        
+        if not transaction:
+            raise HTTPException(status_code=404, detail="Transaction not found")
+        
+        # Get actual fee from completed operation
+        fee = zcash_wallet.get_operation_fee(operation_id)
+        
+        if fee > 0:
+            # Update transaction with actual fee
+            transaction_service = TransactionService(db)
+            updated_transaction = transaction_service.update_transaction_fee(
+                transaction.id, 
+                fee
+            )
+            
+            return {
+                "message": f"Updated transaction {transaction.id} with fee {fee}",
+                "transaction_id": transaction.id,
+                "network_fee": fee,
+                "operation_id": operation_id
+            }
+        else:
+            return {
+                "message": "Fee information not yet available",
+                "operation_id": operation_id
+            }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error updating transaction fee: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to update transaction fee: {str(e)}")
+
+
+@app.post("/api/users/me/shield-funds", response_model=schemas.ShieldFundsResponse)
+def shield_transparent_funds(
+    shield_request: schemas.ShieldFundsRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Shield transparent funds by moving them to the user's shielded address"""
+    try:
+        from .zcash_mod import zcash_wallet
+        from .transaction_service import TransactionService
+        
+        # Validate user has required addresses
+        if not current_user.zcash_transparent_address:
+            raise HTTPException(status_code=400, detail="User does not have a transparent address")
+        
+        if not current_user.zcash_address:
+            raise HTTPException(status_code=400, detail="User does not have a shielded address")
+        
+        # Call the shield function
+        result = zcash_wallet.shield_transparent_funds(
+            transparent_address=current_user.zcash_transparent_address,
+            shielded_address=current_user.zcash_address,
+            amount=shield_request.amount,
+            from_unified_address=current_user.zcash_address  # Use the unified address as from_address
+        )
+        
+        # If shielding was successful, create transaction record
+        if result["status"] == "success":
+            transaction_service = TransactionService(db)
+            
+            # Create transaction record for the shielding operation
+            transaction = transaction_service.create_transaction(
+                user_id=current_user.id,
+                transaction_type=models.TransactionType.SHIELD,
+                amount=result["amount_shielded"],
+                description=f"Shield transparent funds: {result['amount_shielded']} ZEC",
+                from_address=result["from_address"],
+                to_address=result["to_address"],
+                from_address_type=models.AddressType.TRANSPARENT,
+                to_address_type=models.AddressType.SHIELDED_SAPLING,
+                operation_id=result["operation_id"],
+                metadata={"shielding_operation": True}
+            )
+            
+            # Update user balances (move funds from transparent to shielded)
+            # Note: This is optimistic - the actual move will happen when the transaction confirms
+            # The transaction service already handles the balance updates in create_transaction
+            
+        return schemas.ShieldFundsResponse(**result)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error shielding funds: {str(e)}")
+        # Return error in the expected format
+        return schemas.ShieldFundsResponse(
+            status="error",
+            message=f"Failed to shield transparent funds: {str(e)}",
+            error=str(e)
+        )
 
 
 @app.get("/api/pool/balance")

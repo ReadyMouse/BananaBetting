@@ -378,6 +378,35 @@ def z_getoperationstatus(operation_ids: list = None):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+def get_operation_fee(operation_id: str) -> float:
+    """
+    Get the network fee for a completed operation
+    
+    Args:
+        operation_id: The operation ID to check
+    
+    Returns:
+        Network fee amount, or 0.0 if not available
+    """
+    try:
+        operations = z_getoperationstatus([operation_id])
+        if not operations:
+            return 0.0
+        
+        operation = operations[0]
+        if operation.get('status') == 'success' and 'result' in operation:
+            # Get transaction details to find the fee
+            txid = operation['result'].get('txid')
+            if txid:
+                # Get transaction details to extract fee
+                tx_info = get_transaction(txid)
+                return abs(float(tx_info.get('fee', 0.0)))
+        
+        return 0.0
+    except:
+        return 0.0
+
+
 def z_getbalance_for_address(address: str, minconf: int = 1):
     """
     Get the balance for a specific shielded address.
@@ -841,6 +870,92 @@ def get_pool_balance() -> float:
         except:
             # Try shielded if transparent fails
             return z_getbalance(0)
+
+
+def shield_transparent_funds(transparent_address: str, shielded_address: str, amount: float = None, from_unified_address: str = None) -> dict:
+    """
+    Shield transparent funds by sending them to the user's shielded address.
+    
+    Args:
+        transparent_address: User's transparent address containing funds to shield
+        shielded_address: User's shielded address to receive the funds
+        amount: Specific amount to shield, or None to shield all available funds
+        from_unified_address: The unified address to use as from_address (required for z_sendmany)
+    
+    Returns:
+        Dictionary with operation details and status
+    """
+    try:
+        # Get current transparent balance
+        transparent_balance = get_transparent_address_balance(transparent_address)
+        
+        if transparent_balance <= 0:
+            return {
+                "status": "no_funds",
+                "message": "No transparent funds available to shield",
+                "transparent_balance": transparent_balance
+            }
+        
+        # Determine amount to shield
+        if amount is None:
+            amount_to_shield = transparent_balance
+        else:
+            if amount > transparent_balance:
+                return {
+                    "status": "insufficient_funds",
+                    "message": f"Requested amount {amount} exceeds available balance {transparent_balance}",
+                    "transparent_balance": transparent_balance,
+                    "requested_amount": amount
+                }
+            amount_to_shield = amount
+        
+        # Minimum amount check (to account for transaction fees)
+        min_shield_amount = 0.0001  # 0.0001 ZEC minimum
+        if amount_to_shield < min_shield_amount:
+            return {
+                "status": "amount_too_small",
+                "message": f"Amount {amount_to_shield} is below minimum shielding amount {min_shield_amount}",
+                "transparent_balance": transparent_balance,
+                "minimum_amount": min_shield_amount
+            }
+        
+        # Prepare recipients for z_sendmany
+        recipients = [
+            {
+                "address": shielded_address,
+                "amount": amount_to_shield
+            }
+        ]
+        
+        # Use z_sendmany to send from transparent to shielded
+        # Note: For unified addresses, we must use the full unified address, not the extracted transparent component
+        send_from_address = from_unified_address if from_unified_address else shielded_address
+        operation_id = z_sendmany(
+            from_address=send_from_address,
+            recipients=recipients,
+            minconf=1,  # Require 1 confirmation for inputs
+            fee=None,   # Use automatic fee calculation
+            privacy_policy=None
+        )
+        
+        return {
+            "status": "success",
+            "message": f"Shielding transaction submitted successfully",
+            "operation_id": operation_id,
+            "amount_shielded": amount_to_shield,
+            "from_address": send_from_address,
+            "to_address": shielded_address,
+            "transparent_balance_before": transparent_balance
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Failed to shield transparent funds: {str(e)}",
+            "error": str(e)
+        }
 
 
 # TODO: Auto-shielding functions (for future implementation)

@@ -76,6 +76,28 @@ Turns out I need more than 0.0001 to play with...adding 0.0166 ZEC or ~$1.
 
 > Transcation Hash: 56eb59f3f6f01e6d052ebef871234bc06d556c2c7555b728a4b4fd40744788e7
 
+## Sheilding Transparent Funds 
+Just like Zashi, we need the ability to sheild our t-address unshielded funds. Since the shielded fund is a common pool for this mult-user custodial accounting system, we want all funds here to process bets in and out of. 
+
+![Screenshot of warning to sheild funds](screenshots/shield_your_funds.png)
+
+We see that the first 0.0001 transcation I made was public (so I could confirm it all worked). Let's sheild that. 
+
+![screenshots of shielding funds](screenshots/successful_sheild_BB.png)
+
+Let's check that OPID into a transcation hash. 
+> OPID: opid-4bc8e0c7-a315-4364-9a9e-b0b3ed140cb2
+
+![screenshots of transcation hash checking](screenshots/shield_your_funds_txid.png)
+
+And now to check on ZEC block exploer, althought we won't see much. 
+
+> Transcation hash: 0b1cf9e8d4536c68c52246e334504c296c5658bb07a45674cb9eb292d45dc909
+
+![Screenshot of the block explorer](screenshots/shield_your_funds_blockexplorer.png)
+
+Yay, we have fully shielded funds with a backend bookkeeping system. (Yes I know it's not full defi, this is a hackathon and custodial wallets make this easier.)
+
 ## Submiting a Charity
 Let's submit a new charity as well as it's zcash addresses. We ask for both transparent and sheilded addreses so that if people want to make donations in either one that is an option. All betting distributions will be made to the transaparent address. We do not create custodial accounts for the non-profits, they get the distributions automatically.
 

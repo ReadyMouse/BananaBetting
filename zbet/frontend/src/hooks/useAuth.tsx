@@ -88,16 +88,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error('No user logged in');
       }
       
-      const balanceData = await zcashApi.refreshBalance();
+      // Use the new balance summary API for more accurate data
+      const balanceSummary = await zcashApi.getBalanceSummary();
       
       // Update user with new balance information
       setUser(prevUser => {
         if (!prevUser) return null;
         return {
           ...prevUser,
-          balance: balanceData.balance.toString(),
-          transparent_balance: balanceData.transparent_balance,
-          shielded_balance: balanceData.shielded_balance
+          balance: balanceSummary.total_balance.toString(),
+          transparent_balance: balanceSummary.transparent_balance,
+          shielded_balance: balanceSummary.shielded_balance,
+          last_balance_update: balanceSummary.last_balance_update,
+          balance_version: balanceSummary.balance_version
         };
       });
     } catch (error) {

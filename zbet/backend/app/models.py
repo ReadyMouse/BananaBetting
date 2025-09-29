@@ -423,6 +423,7 @@ class TransactionType(enum.Enum):
     FEE_CHARITY = "fee_charity"           # Charity fee collection
     BALANCE_CORRECTION = "balance_correction"  # Manual balance adjustments
     POOL_TRANSFER = "pool_transfer"       # Transfer between shielded/transparent pools
+    SHIELD = "shield"                     # Move funds from transparent to shielded pool
 
 
 class TransactionStatus(enum.Enum):

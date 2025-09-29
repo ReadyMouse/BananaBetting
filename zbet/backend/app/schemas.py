@@ -17,11 +17,14 @@ class User(UserBase):
     balance: str  # Legacy field
     shielded_balance: float = 0.0
     transparent_balance: float = 0.0
-    last_balance_update: str
-    balance_version: int
+    last_balance_update: str | None = None
+    balance_version: int = 1
 
     class Config:
         from_attributes = True
+        json_encoders = {
+            datetime: lambda v: v.isoformat() if v else None
+        }
 
 class Token(BaseModel):
     access_token: str
@@ -394,7 +397,29 @@ class DepositRequest(BaseModel):
     from_address: str
     zcash_transaction_id: str
     address_type: str = "transparent"
-    confirmations: int = 1
+
+
+class ShieldFundsRequest(BaseModel):
+    """Schema for shield funds requests"""
+    amount: float | None = None  # If None, shield all available transparent funds
+    
+    class Config:
+        from_attributes = True
+
+
+class ShieldFundsResponse(BaseModel):
+    """Schema for shield funds responses"""
+    status: str
+    message: str
+    operation_id: str | None = None
+    amount_shielded: float | None = None
+    from_address: str | None = None
+    to_address: str | None = None
+    transparent_balance_before: float | None = None
+    transparent_balance: float | None = None
+    requested_amount: float | None = None
+    minimum_amount: float | None = None
+    error: str | None = None
     
     class Config:
         from_attributes = True

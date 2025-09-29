@@ -200,3 +200,7 @@ zchat/backend/venv/ # Virtual environment (already covered above but being expli
 
 # Vercel Serverless Functions
 .vercel
+
+# Extra video clips
+screenrecordings/*
+ZECHUB_hackathon_Sept_2025_v1.mp4 

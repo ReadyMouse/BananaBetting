@@ -17,7 +17,8 @@ import {
   Edit,
   Save,
   X,
-  Send
+  Send,
+  ArrowUpRight
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { cn, formatZcash, getRandomBananaEmoji } from '@/lib/utils';
@@ -62,6 +63,12 @@ export default function ProfilePage() {
   const [manualOperationId, setManualOperationId] = useState('');
   const [refreshingBalance, setRefreshingBalance] = useState(false);
   const [refreshMessage, setRefreshMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [shieldingFunds, setShieldingFunds] = useState(false);
+  const [shieldResult, setShieldResult] = useState<{ 
+    status: string; 
+    message: string; 
+    operation_id?: string; 
+  } | null>(null);
 
   useEffect(() => {
     setEmoji(getRandomBananaEmoji());
@@ -147,6 +154,41 @@ export default function ProfilePage() {
       }, 5000);
     } finally {
       setRefreshingBalance(false);
+    }
+  };
+
+  const handleShieldFunds = async () => {
+    setShieldingFunds(true);
+    setShieldResult(null);
+    
+    try {
+      // Import the API functions
+      const { zcashApi } = await import('@/lib/api');
+      
+      // Shield all transparent funds (passing null amount)
+      const result = await zcashApi.shieldFunds();
+      
+      setShieldResult({
+        status: result.status,
+        message: result.message,
+        operation_id: result.operation_id
+      });
+      
+      // If successful, refresh the balance to show updated amounts
+      if (result.status === 'success') {
+        setTimeout(() => {
+          handleRefreshBalance();
+        }, 1000);
+      }
+      
+    } catch (error: any) {
+      console.error('Failed to shield funds:', error);
+      setShieldResult({
+        status: 'error',
+        message: error.message || 'Failed to shield transparent funds'
+      });
+    } finally {
+      setShieldingFunds(false);
     }
   };
 
@@ -408,27 +450,24 @@ export default function ProfilePage() {
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
                         <p className="text-banana-100 mb-1">Total Balance</p>
-                        <p className="text-3xl font-bold mb-4">{formatZcash(walletData.balance)}</p>
-                        
-                        {/* Balance Breakdown */}
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="bg-white/10 rounded-lg p-3">
-                            <p className="text-banana-100 text-sm mb-1">Transparent</p>
-                            <p className="text-lg font-semibold">{formatZcash(user?.transparent_balance || 0)}</p>
-                          </div>
-                          <div className="bg-white/10 rounded-lg p-3">
-                            <p className="text-banana-100 text-sm mb-1">Shielded</p>
-                            <p className="text-lg font-semibold">{formatZcash(user?.shielded_balance || 0)}</p>
-                          </div>
-                        </div>
+                        <p className="text-4xl font-bold mb-2">{formatZcash(walletData.balance)}</p>
+                        <p className="text-banana-100 text-sm">
+                          Last updated: {user?.last_balance_update ? 
+                            new Date(user.last_balance_update).toLocaleString() : 
+                            'Never'
+                          }
+                        </p>
                       </div>
-                      <button
-                        onClick={handleRefreshBalance}
-                        disabled={refreshingBalance}
-                        className="p-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ml-4"
-                      >
-                        <RefreshCw size={24} className={refreshingBalance ? 'animate-spin' : ''} />
-                      </button>
+                      <div className="flex flex-col items-center space-y-2">
+                        <div className="text-4xl">💰</div>
+                        <button
+                          onClick={handleRefreshBalance}
+                          disabled={refreshingBalance}
+                          className="p-3 bg-white/20 rounded-lg hover:bg-white/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <RefreshCw size={20} className={refreshingBalance ? 'animate-spin' : ''} />
+                        </button>
+                      </div>
                     </div>
                   </div>
 
@@ -503,17 +542,88 @@ export default function ProfilePage() {
                         </span>
                       </div>
                       {walletData.isConnected && (
-                        <button
-                          onClick={handleRefreshBalance}
-                          disabled={refreshingBalance}
-                          className="px-4 py-2 bg-grass-500 text-white rounded-lg hover:bg-grass-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
-                        >
-                          <RefreshCw size={16} className={refreshingBalance ? 'animate-spin' : ''} />
-                          <span>{refreshingBalance ? 'Refreshing...' : 'Refresh'}</span>
-                        </button>
+                        <div className="text-sm text-grass-600">
+                          Balance Version: {user?.balance_version || 1}
+                        </div>
                       )}
                     </div>
                   </div>
+
+                  {/* Shield Funds Section */}
+                  {user?.transparent_balance && parseFloat(user.transparent_balance.toString()) > 0 && (
+                    <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="text-lg font-semibold text-blue-800 mb-2">Shield Your Funds</h3>
+                          <p className="text-sm text-blue-700 mb-3">
+                            You have {formatZcash(parseFloat(user.transparent_balance.toString()))} in your transparent address.
+                            Shield these funds for enhanced privacy by moving them to your shielded pool.
+                          </p>
+                        </div>
+                        <div className="ml-4">
+                          <button
+                            onClick={handleShieldFunds}
+                            disabled={shieldingFunds}
+                            className={cn(
+                              "flex items-center space-x-2 px-4 py-3 rounded-lg font-medium transition-colors",
+                              shieldingFunds
+                                ? "bg-gray-400 text-gray-700 cursor-not-allowed"
+                                : "bg-blue-500 text-white hover:bg-blue-600"
+                            )}
+                          >
+                            {shieldingFunds ? (
+                              <>
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                <span>Shielding...</span>
+                              </>
+                            ) : (
+                              <>
+                                <ArrowUpRight size={16} />
+                                <span>Shield Funds</span>
+                                <Shield size={16} />
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                      
+                      {/* Shield Result */}
+                      {shieldResult && (
+                        <div className={cn(
+                          "mt-4 p-3 rounded-lg border",
+                          shieldResult.status === 'success' 
+                            ? "bg-green-50 border-green-200 text-green-800" 
+                            : shieldResult.status === 'no_funds'
+                            ? "bg-yellow-50 border-yellow-200 text-yellow-800"
+                            : "bg-red-50 border-red-200 text-red-800"
+                        )}>
+                          <div className="flex items-start space-x-2">
+                            <div className="text-lg">
+                              {shieldResult.status === 'success' ? '✅' : 
+                               shieldResult.status === 'no_funds' ? '⚠️' : '❌'}
+                            </div>
+                            <div className="flex-1">
+                              <p className="font-medium">{shieldResult.message}</p>
+                              {shieldResult.operation_id && (
+                                <div className="mt-2">
+                                  <p className="text-xs font-medium">Operation ID:</p>
+                                  <p className="text-xs font-mono bg-white/50 px-2 py-1 rounded">
+                                    {shieldResult.operation_id}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => setShieldResult(null)}
+                            className="mt-2 text-xs underline hover:no-underline"
+                          >
+                            Dismiss
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Refresh Message */}
                   {refreshMessage && (
@@ -672,8 +782,11 @@ export default function ProfilePage() {
                       <div>
                         <p className="text-banana-100 mb-1">Available Balance</p>
                         <p className="text-3xl font-bold">{formatZcash(walletData.balance)}</p>
+                        <p className="text-banana-100 text-sm mt-1">
+                          Ready to send 🚀
+                        </p>
                       </div>
-                      <div className="text-4xl">💰</div>
+                      <div className="text-4xl">💸</div>
                     </div>
                   </div>
 

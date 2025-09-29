@@ -78,8 +78,14 @@ class TransactionService:
         shielded_delta = 0.0
         transparent_delta = 0.0
         
+        # Special handling for SHIELD transactions (moves funds between pools)
+        if transaction_type == models.TransactionType.SHIELD:
+            # Shield transactions move funds from transparent to shielded
+            # The amount is what gets shielded, but we also need to account for network fee
+            transparent_delta = -(amount + network_fee)  # Debit transparent pool (amount + fee)
+            shielded_delta = amount                       # Credit shielded pool (only the amount)
         # Logic to determine pool based on transaction type and addresses
-        if self._affects_shielded_pool(transaction_type, from_address_type, to_address_type):
+        elif self._affects_shielded_pool(transaction_type, from_address_type, to_address_type):
             shielded_delta = amount
         else:
             transparent_delta = amount
@@ -153,6 +159,47 @@ class TransactionService:
         
         return transaction_type in shielded_transaction_types
     
+    def update_transaction_fee(
+        self,
+        transaction_id: int,
+        network_fee: float
+    ) -> models.UserTransaction:
+        """
+        Update transaction with actual network fee and adjust user balances accordingly
+        """
+        transaction = self.db.query(models.UserTransaction).filter(
+            models.UserTransaction.id == transaction_id
+        ).first()
+        
+        if not transaction:
+            raise ValueError(f"Transaction {transaction_id} not found")
+        
+        # Get user
+        user = self.db.query(models.User).filter(models.User.id == transaction.user_id).first()
+        if not user:
+            raise ValueError(f"User {transaction.user_id} not found")
+        
+        # Calculate the difference between estimated and actual fee
+        old_fee = transaction.network_fee
+        fee_difference = network_fee - old_fee
+        
+        # For SHIELD transactions, adjust transparent balance for fee difference
+        if transaction.transaction_type == models.TransactionType.SHIELD and fee_difference != 0:
+            # Additional fee reduces transparent balance
+            user.update_balances(transparent_delta=-fee_difference)
+            
+            # Update transaction record
+            transaction.transparent_balance_after = user.transparent_balance
+        
+        # Update transaction with actual fee
+        transaction.network_fee = network_fee
+        
+        self.db.commit()
+        self.db.refresh(transaction)
+        
+        logger.info(f"Updated transaction {transaction_id} with network fee {network_fee}")
+        return transaction
+
     def confirm_transaction(
         self,
         transaction_id: int,

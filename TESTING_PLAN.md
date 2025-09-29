@@ -11,7 +11,7 @@ This document tracks comprehensive end-to-end testing of the BananaBetting appli
 
 ---
 
-## Test Flow 1: User Creation & Wallet Generation
+## [DONE] Test Flow 1: User Creation & Wallet Generation
 
 ### Objective
 Verify that new users can be created with properly generated wallet addresses and recovery keys.
@@ -44,7 +44,7 @@ Verify that new users can be created with properly generated wallet addresses an
 
 ---
 
-## Test Flow 2: Profile Page & Balance Display
+## [DONE] Test Flow 2: Profile Page & Balance Display
 
 ### Objective
 Verify that user profile displays wallet addresses and current balance.
@@ -75,7 +75,7 @@ Verify that user profile displays wallet addresses and current balance.
 
 ---
 
-## Test Flow 3: External Funding & Balance Update
+## [DONE] Test Flow 3: External Funding & Balance Update
 
 ### Objective
 Test external funding of user wallet and balance refresh functionality.

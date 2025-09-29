@@ -114,6 +114,13 @@ BananaBetting follows a **full-stack web architecture** with **blockchain integr
 5. **Automated Payouts** → Batch Zcash transactions to winners and charities
 6. **Transparency** → Public transactions for charity payments, private for users
 
+Note: There are many things that require button clicks at the moment, but would otherwise be automated systems running at regular intervals. Things like:
+- Auto-sheilding funds in t-addresses into the sheilded pool
+- Processing the payouts once the consensus threshold is met by a betting event
+- Automatically setting the settlement date 
+- Scaling the # of validators based on pool side (low value betting event needs less validators)
+- Incentitizing betting events close to settlement but below consensus threshold with bonus rewards
+
 ### Key Architectural Decisions
 - **Pari-Mutuel Betting**: Winners split losers' pot proportionally
 - **Dual Transaction Types**: Private payments to users, public to charities
