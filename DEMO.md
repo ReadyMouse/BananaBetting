@@ -1,4 +1,4 @@
-# A Step-by-Step Demostration of Capbilities 
+# A Step-by-Step Demonstration of Capabilities 
 
 **⚠️ IMPORTANT DISCLAIMER ⚠️**
 This project was created for the [**2025 ZecHub Hackathon**](https://hackathon.zechub.wiki/) and is intended **ONLY** for educational purposes, blockchain functionality testing, and hackathon demonstration.
@@ -74,36 +74,36 @@ Yes, we see a new balance in test2's account on the blockchain. But does Banana 
 
 Turns out I need more than 0.0001 to play with...adding 0.0166 ZEC or ~$1. 
 
-> Transcation Hash: 56eb59f3f6f01e6d052ebef871234bc06d556c2c7555b728a4b4fd40744788e7
+> Transaction Hash: 56eb59f3f6f01e6d052ebef871234bc06d556c2c7555b728a4b4fd40744788e7
 
-## Sheilding Transparent Funds 
-Just like Zashi, we need the ability to sheild our t-address unshielded funds. Since the shielded fund is a common pool for this mult-user custodial accounting system, we want all funds here to process bets in and out of. 
+## Shielding Transparent Funds 
+Just like Zashi, we need the ability to shield our t-address unshielded funds. Since the shielded fund is a common pool for this multi-user custodial accounting system, we want all funds here to process bets in and out of. 
 
-![Screenshot of warning to sheild funds](screenshots/shield_your_funds.png)
+![Screenshot of warning to shield funds](screenshots/shield_your_funds.png)
 
-We see that the first 0.0001 transcation I made was public (so I could confirm it all worked). Let's sheild that. 
+We see that the first 0.0001 transaction I made was public (so I could confirm it all worked). Let's shield that. 
 
-![screenshots of shielding funds](screenshots/successful_sheild_BB.png)
+![screenshots of shielding funds](screenshots/successful_shield_BB.png)
 
-Let's check that OPID into a transcation hash. 
+Let's check that OPID into a transaction hash. 
 > OPID: opid-4bc8e0c7-a315-4364-9a9e-b0b3ed140cb2
 
-![screenshots of transcation hash checking](screenshots/shield_your_funds_txid.png)
+![screenshots of transaction hash checking](screenshots/shield_your_funds_txid.png)
 
-And now to check on ZEC block exploer, althought we won't see much. 
+And now to check on ZEC block explorer, although we won't see much. 
 
-> Transcation hash: 0b1cf9e8d4536c68c52246e334504c296c5658bb07a45674cb9eb292d45dc909
+> Transaction hash: 0b1cf9e8d4536c68c52246e334504c296c5658bb07a45674cb9eb292d45dc909
 
 ![Screenshot of the block explorer](screenshots/shield_your_funds_blockexplorer.png)
 
 Yay, we have fully shielded funds with a backend bookkeeping system. (Yes I know it's not full defi, this is a hackathon and custodial wallets make this easier.)
 
-## Submiting a Charity
-Let's submit a new charity as well as it's zcash addresses. We ask for both transparent and sheilded addreses so that if people want to make donations in either one that is an option. All betting distributions will be made to the transaparent address. We do not create custodial accounts for the non-profits, they get the distributions automatically.
+## Submitting a Charity
+Let's submit a new charity as well as its zcash addresses. We ask for both transparent and shielded addresses so that if people want to make donations in either one that is an option. All betting distributions will be made to the transparent address. We do not create custodial accounts for the non-profits, they get the distributions automatically.
 
 ![Screenshot of making a Charity](screenshots/add_nonprofit.png)
 
-Here is our new chairty listing, as well as a place to find other charities that accept cryptocurrency.
+Here is our new charity listing, as well as a place to find other charities that accept cryptocurrency.
 
 ![Screenshot of the charity list page](screenshots/charity_made.png)
 
@@ -126,7 +126,7 @@ If they have enough ZEC in their account to cover the bet:
 
 ![Screenshot of placing a bet: successful](screenshots/placed_bets_page.png)
 
-Now the bet is recorded in the database, since all funds at in the shielded pool to start, this bet doesn't require a blockchain transaction. We just see it in the updated wallet balance.
+Now the bet is recorded in the database, since all funds are in the shielded pool to start, this bet doesn't require a blockchain transaction. We just see it in the updated wallet balance.
 
 ![screenshot of new wallet balance](screenshots/post_bet_wallet_balance.png)
 
@@ -144,7 +144,7 @@ Then we can see results of other validators.
 
 ## [Admin] Payouts
 
-Now that the event is settled, and the consensus reached it's time to payout the winners. In a real system, this would be automated. In this hackathon system, I have to push the buttons. The event is processed in a single, z_sendmany transcation.
+Now that the event is settled, and the consensus reached it's time to payout the winners. In a real system, this would be automated. In this hackathon system, I have to push the buttons. The event is processed in a single, z_sendmany transaction.
 
 (Yes, you can see some mock addresses for my fake validators. It's not a problem.)
 
@@ -156,7 +156,7 @@ Success! We paid out the betting event.
 
 ![screenshot of the payout success and OPID](screenshots/payout_success_OPID.png)
 
-Going from OPID to transcation hash:
+Going from OPID to transaction hash:
 
 >Transaction hash ID::b51575a20aba5ac028aef1869d8a1143e84fcb311bdc03afe9071d2c320cd4fd
 
@@ -166,25 +166,25 @@ Checking "The House"'s Zashi account
 
 ![screenshot of my transaction in Zashi](screenshots/payout_house_zashi.png)
 
-Wait a minute...why are there only 2 blockchain transcations (1 private, 1 public) if we really have 7? Since this is a custodial situation, the Event Creator and Validators get the money deposited into their Banana Betting accounts. This is an internal database update, and not a blockchain transaction. They would need to cash out their balance from Banana Betting's wallet to their own self-custody wallet. 
+Wait a minute...why are there only 2 blockchain transactions (1 private, 1 public) if we really have 7? Since this is a custodial situation, the Event Creator and Validators get the money deposited into their Banana Betting accounts. This is an internal database update, and not a blockchain transaction. They would need to cash out their balance from Banana Betting's wallet to their own self-custody wallet. 
 
 ## Cashing out Balances
 
 ![Screenshots of a user cashing out their balance](screenshots/cash_out_user_before.png)
 
-![Screenshots of the transcation hashses](screenshots/success_cashout_BB.png)
+![Screenshots of the transaction hashes](screenshots/success_cashout_BB.png)
 
-![Screenshots of my Zashi wallet with the new transcation](screenshots/zashi_recieved_cashout.png)
+![Screenshots of my Zashi wallet with the new transaction](screenshots/zashi_received_cashout.png)
 
 ![Screenshots of a user cashing out their balance](screenshots/cash_out_user_after.png)
 
 **Private Operation ID**::opid-11e9f74d-0b54-4911-8598-fe5dcf34e495
 
->**Private Transcation Hash** :: 45e70589736d4a9bd6045a3dc1c9320d5f3483d002872e6da55a3756b50d29d0
+>**Private Transaction Hash** :: 45e70589736d4a9bd6045a3dc1c9320d5f3483d002872e6da55a3756b50d29d0
 
 ![Screenshot of blockexplorer](screenshots/cashout_block_explorer.png)
 
-But where did my funds go? I had 0.0167 in transparent ZEC and then sent 0.00001 to a sheilded address. Where did the change go? Of course, to it returned to the shielded pool.
+But where did my funds go? I had 0.0167 in transparent ZEC and then sent 0.00001 to a shielded address. Where did the change go? Of course, it returned to the shielded pool.
 
 ```bash
 curl --user rpcuser:password --data-binary '{"jsonrpc": "1.0", "id":"curltest", "method": "z_gettotalbalance", "params": [5] }' -H 'content-type: text/plain;' http://84.32.151.95:8232/
