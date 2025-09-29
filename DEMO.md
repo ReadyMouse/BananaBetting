@@ -164,14 +164,27 @@ The event is processed in a single transcation.
 
 ## Cashing out Balances
 
-![Screenshots of a user cashing out their balance](screenshots/cash_out_user.png)
+![Screenshots of a user cashing out their balance](screenshots/cash_out_user_before.png)
 
 ![Screenshots of the transcation hashses](screenshots/success_cashout_BB.png)
 
 ![Screenshots of my Zashi wallet with the new transcation](screenshots/zashi_recieved_cashout.png)
 
+![Screenshots of a user cashing out their balance](screenshots/cash_out_user_after.png)
+
 **Private Operation ID**::opid-11e9f74d-0b54-4911-8598-fe5dcf34e495
 
->**Private Transcation Has** :: 45e70589736d4a9bd6045a3dc1c9320d5f3483d002872e6da55a3756b50d29d0
+>**Private Transcation Hash** :: 45e70589736d4a9bd6045a3dc1c9320d5f3483d002872e6da55a3756b50d29d0
 
 ![Screenshot of blockexplorer](screenshots/cashout_block_explorer.png)
+
+But where did my funds go? I had 0.0167 in transparent ZEC and then sent 0.00001 to a sheilded address. Where did the change go? Of course, to it returned to the shielded pool.
+
+```bash
+curl --user rpcuser:password --data-binary '{"jsonrpc": "1.0", "id":"curltest", "method": "z_gettotalbalance", "params": [5] }' -H 'content-type: text/plain;' http://84.32.151.95:8232/
+```
+Results:
+```
+{"result":{"transparent":"0.0001","private":"0.01644","total":"0.01654"},"error":null,"id":"curltest"}
+```
+

@@ -49,12 +49,34 @@ class User(Base):
     zcash_account = Column(String, primary_key=False)
     zcash_address = Column(String, unique=True, index=True)
     zcash_transparent_address = Column(String, unique=True, index=True)
+    
+    # Legacy balance field - kept for backward compatibility
     balance = Column(String, unique=False, index=True)
+    
+    # New separate balance tracking
+    shielded_balance = Column(Float, default=0.0, nullable=False)  # Balance in shielded pool
+    transparent_balance = Column(Float, default=0.0, nullable=False)  # Balance in transparent addresses
+    
+    # Balance metadata
+    last_balance_update = Column(DateTime, default=datetime.utcnow, nullable=False)
+    balance_version = Column(Integer, default=1, nullable=False)  # For optimistic locking
 
     # Relationships
     bets = relationship("Bet", back_populates="user")
     payouts = relationship("Payout", back_populates="user")
     validation_results = relationship("ValidationResult", back_populates="user")
+    transactions = relationship("UserTransaction", back_populates="user")
+    
+    def get_total_balance(self):
+        """Get total balance across all address types"""
+        return self.shielded_balance + self.transparent_balance
+    
+    def update_balances(self, shielded_delta=0.0, transparent_delta=0.0):
+        """Update balances with delta amounts"""
+        self.shielded_balance += shielded_delta
+        self.transparent_balance += transparent_delta
+        self.last_balance_update = datetime.utcnow()
+        self.balance_version += 1
 
 
 # Enums for status fields
@@ -384,5 +406,176 @@ class ValidationResult(Base):
     __table_args__ = (
         # Each user can only validate each event once
         Index('idx_user_event_unique', 'user_id', 'sport_event_id', unique=True),
+    )
+
+
+# Transaction tracking enums
+class TransactionType(enum.Enum):
+    DEPOSIT = "deposit"                    # User deposits funds
+    WITHDRAWAL = "withdrawal"              # User withdraws/cashouts funds
+    BET_PLACED = "bet_placed"             # Funds moved from user to betting pool
+    BET_REFUND = "bet_refund"             # Funds returned from cancelled/expired bet
+    PAYOUT_WINNING = "payout_winning"     # Winnings paid to user
+    PAYOUT_REFUND = "payout_refund"       # Refund for push/tie outcomes
+    FEE_HOUSE = "fee_house"               # House fee collection
+    FEE_CREATOR = "fee_creator"           # Event creator fee collection
+    FEE_VALIDATOR = "fee_validator"       # Validator fee collection
+    FEE_CHARITY = "fee_charity"           # Charity fee collection
+    BALANCE_CORRECTION = "balance_correction"  # Manual balance adjustments
+    POOL_TRANSFER = "pool_transfer"       # Transfer between shielded/transparent pools
+
+
+class TransactionStatus(enum.Enum):
+    PENDING = "pending"                   # Transaction initiated but not confirmed
+    CONFIRMED = "confirmed"               # Transaction confirmed on blockchain
+    FAILED = "failed"                     # Transaction failed
+    CANCELLED = "cancelled"               # Transaction cancelled before processing
+
+
+class AddressType(enum.Enum):
+    TRANSPARENT = "transparent"           # t-address
+    SHIELDED_SAPLING = "shielded_sapling" # z-address
+    SHIELDED_ORCHARD = "shielded_orchard" # Orchard shielded address
+    UNIFIED = "unified"                   # u-address (can contain multiple pools)
+
+
+# Main transaction tracking model
+class UserTransaction(Base):
+    __tablename__ = "user_transactions"
+
+    id = Column(Integer, primary_key=True)
+    
+    # User and event relationships
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    sport_event_id = Column(Integer, ForeignKey("sport_events.id"), nullable=True)  # Nullable for non-betting transactions
+    bet_id = Column(Integer, ForeignKey("bets.id"), nullable=True)  # Link to specific bet if applicable
+    payout_id = Column(Integer, ForeignKey("payouts.id"), nullable=True)  # Link to specific payout if applicable
+    
+    # Transaction details
+    transaction_type = Column(Enum(TransactionType), nullable=False)
+    amount = Column(Float, nullable=False)  # Amount in ZEC (positive for credits, negative for debits)
+    
+    # Address and pool information
+    from_address = Column(String(100), nullable=True)  # Source address
+    to_address = Column(String(100), nullable=True)    # Destination address
+    from_address_type = Column(Enum(AddressType), nullable=True)
+    to_address_type = Column(Enum(AddressType), nullable=True)
+    
+    # Balance tracking
+    shielded_balance_before = Column(Float, nullable=False, default=0.0)
+    transparent_balance_before = Column(Float, nullable=False, default=0.0)
+    shielded_balance_after = Column(Float, nullable=False, default=0.0)
+    transparent_balance_after = Column(Float, nullable=False, default=0.0)
+    
+    # Blockchain transaction details
+    zcash_transaction_id = Column(String(100), nullable=True)  # On-chain transaction hash
+    operation_id = Column(String(100), nullable=True)         # Zcash operation ID for async operations
+    block_height = Column(Integer, nullable=True)             # Block height when confirmed
+    confirmations = Column(Integer, default=0, nullable=False)
+    
+    # Status and timing
+    status = Column(Enum(TransactionStatus), default=TransactionStatus.PENDING, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    confirmed_at = Column(DateTime, nullable=True)
+    
+    # Metadata and notes
+    description = Column(Text, nullable=True)  # Human-readable description
+    transaction_metadata = Column(Text, nullable=True)     # JSON metadata for additional info
+    
+    # Fee information
+    network_fee = Column(Float, default=0.0, nullable=False)  # Network transaction fee
+    
+    # Relationships
+    user = relationship("User", back_populates="transactions")
+    sport_event = relationship("SportEvent")
+    bet = relationship("Bet")
+    payout = relationship("Payout")
+    
+    # Indexes for performance
+    __table_args__ = (
+        Index('idx_user_transactions_user_id', 'user_id'),
+        Index('idx_user_transactions_type', 'transaction_type'),
+        Index('idx_user_transactions_status', 'status'),
+        Index('idx_user_transactions_created_at', 'created_at'),
+        Index('idx_user_transactions_zcash_tx_id', 'zcash_transaction_id'),
+    )
+    
+    def get_metadata(self):
+        """Parse transaction_metadata JSON field"""
+        if self.transaction_metadata:
+            return json.loads(self.transaction_metadata)
+        return {}
+    
+    def set_metadata(self, metadata_dict):
+        """Set metadata from dictionary"""
+        self.transaction_metadata = json.dumps(metadata_dict)
+    
+    def is_credit(self):
+        """Check if transaction increases user balance"""
+        return self.amount > 0
+    
+    def is_debit(self):
+        """Check if transaction decreases user balance"""
+        return self.amount < 0
+
+
+# Balance reconciliation tracking
+class BalanceReconciliation(Base):
+    __tablename__ = "balance_reconciliations"
+
+    id = Column(Integer, primary_key=True)
+    
+    # Reconciliation details
+    reconciliation_date = Column(DateTime, default=datetime.utcnow, nullable=False)
+    total_users_checked = Column(Integer, nullable=False, default=0)
+    discrepancies_found = Column(Integer, nullable=False, default=0)
+    
+    # Pool totals
+    total_shielded_pool_blockchain = Column(Float, nullable=False, default=0.0)  # Actual blockchain balance
+    total_shielded_pool_database = Column(Float, nullable=False, default=0.0)    # Sum of user balances in DB
+    total_transparent_pool_blockchain = Column(Float, nullable=False, default=0.0)
+    total_transparent_pool_database = Column(Float, nullable=False, default=0.0)
+    
+    # Status and notes
+    reconciliation_status = Column(String(20), default="completed", nullable=False)  # "completed", "failed", "partial"
+    notes = Column(Text, nullable=True)
+    
+    # Relationships to individual user reconciliations
+    user_reconciliations = relationship("UserBalanceReconciliation", back_populates="reconciliation")
+
+
+# Individual user balance reconciliation records
+class UserBalanceReconciliation(Base):
+    __tablename__ = "user_balance_reconciliations"
+
+    id = Column(Integer, primary_key=True)
+    reconciliation_id = Column(Integer, ForeignKey("balance_reconciliations.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    
+    # Balance comparison
+    database_shielded_balance = Column(Float, nullable=False, default=0.0)
+    database_transparent_balance = Column(Float, nullable=False, default=0.0)
+    calculated_shielded_balance = Column(Float, nullable=False, default=0.0)  # From transaction history
+    calculated_transparent_balance = Column(Float, nullable=False, default=0.0)
+    
+    # Discrepancy tracking
+    shielded_discrepancy = Column(Float, nullable=False, default=0.0)
+    transparent_discrepancy = Column(Float, nullable=False, default=0.0)
+    has_discrepancy = Column(Boolean, default=False, nullable=False)
+    
+    # Resolution
+    discrepancy_resolved = Column(Boolean, default=False, nullable=False)
+    resolution_notes = Column(Text, nullable=True)
+    resolved_at = Column(DateTime, nullable=True)
+    
+    # Relationships
+    reconciliation = relationship("BalanceReconciliation", back_populates="user_reconciliations")
+    user = relationship("User")
+    
+    # Indexes
+    __table_args__ = (
+        Index('idx_user_balance_reconciliation_user_id', 'user_id'),
+        Index('idx_user_balance_reconciliation_reconciliation_id', 'reconciliation_id'),
+        Index('idx_user_balance_reconciliation_discrepancy', 'has_discrepancy'),
     )
 

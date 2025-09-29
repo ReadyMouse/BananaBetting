@@ -7,6 +7,7 @@ from typing import Annotated, Optional
 from . import auth, crud, models, schemas, cleaners, serializers, betting_utils
 from .database import SessionLocal, engine
 from .config import settings
+from .transaction_service import TransactionService, BalanceReconciliationService
 
 # EST timezone utility will be imported from betting_utils when needed
 
@@ -467,17 +468,22 @@ def refresh_balance(current_user: models.User = Depends(get_current_user), db: S
     try:
         from .zcash_mod import zcash_wallet
         
-        # Get current balance from Zcash node
-        current_balance = zcash_wallet.get_transparent_address_balance(current_user.zcash_transparent_address)
+        # Get combined balance from both transparent and shielded addresses
+        balance_info = zcash_wallet.get_combined_user_balance(
+            current_user.zcash_transparent_address,
+            current_user.zcash_address
+        )
         
-        # Update user's balance in database
-        current_user.balance = str(current_balance)
+        # Update user's balance in database with total balance
+        current_user.balance = str(balance_info["total_balance"])
         db.commit()
         
         return {
             "address": current_user.zcash_address,
             "transparent_address": current_user.zcash_transparent_address,
-            "balance": current_balance,
+            "balance": balance_info["total_balance"],
+            "transparent_balance": balance_info["transparent_balance"],
+            "shielded_balance": balance_info["shielded_balance"],
             "message": "Balance refreshed successfully"
         }
     except Exception as e:
@@ -491,9 +497,12 @@ def cashout_user_funds(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    """Send user funds to a specified address"""
+    """Send user funds to a specified address with transaction tracking"""
     try:
         from .zcash_mod import zcash_wallet, zcash_utils
+        
+        # Initialize transaction service
+        transaction_service = TransactionService(db)
         
         # Validate input parameters
         if cashout_request.amount <= 0:
@@ -506,23 +515,21 @@ def cashout_user_funds(
             raise HTTPException(status_code=400, detail=f"Rotten bananas! Invalid recipient address: {str(e)}")
         
         # Use the user's primary Zcash address (which should be a Unified Address)
-        # This avoids the "bare receiver" issue by using the full UA
         sending_address = current_user.zcash_address
         
         if not sending_address:
             raise HTTPException(status_code=400, detail="User has no Zcash address configured")
         
-        # For Unified Addresses, we check the total balance across all pools
-        # The wallet will automatically choose the best pool for sending
-        current_balance = zcash_wallet.get_user_balance_by_address(sending_address)
+        # Check user balance using transaction service
+        balance_summary = transaction_service.get_user_balance_summary(current_user.id)
+        available_balance = balance_summary["available_balance"]
         
-        if current_balance < cashout_request.amount:
+        if available_balance < cashout_request.amount:
             raise HTTPException(
                 status_code=400,
-                detail=f"Insufficient balance. Available: {current_balance:.8f} ZEC, Requested: {cashout_request.amount:.8f} ZEC"
+                detail=f"Insufficient balance. Available: {available_balance:.8f} ZEC, Requested: {cashout_request.amount:.8f} ZEC"
             )
         
-        # Prepare transaction using z_sendmany for shielded sending
         # Ensure amount is properly formatted (max 8 decimal places for ZEC)
         formatted_amount = round(cashout_request.amount, 8)
         
@@ -537,39 +544,62 @@ def cashout_user_funds(
                 detail=f"Amount too small. Minimum: {min_amount} ZEC, Provided: {formatted_amount} ZEC"
             )
         
-        # Use the formatted amount directly (like zchat does)
-        recipients = [{
-            "address": cashout_request.recipient_address,
-            "amount": formatted_amount
-        }]
+        # Determine address type for transaction tracking
+        address_type = models.AddressType.TRANSPARENT
+        if cashout_request.recipient_address.startswith('z'):
+            address_type = models.AddressType.SHIELDED_SAPLING
+        elif cashout_request.recipient_address.startswith('u'):
+            address_type = models.AddressType.UNIFIED
         
-        # Add memo if provided and recipient supports it (shielded address)
-        if cashout_request.memo and cashout_request.recipient_address.startswith('z'):
-            recipients[0]["memo"] = cashout_request.memo
-        
-        # Send the transaction with appropriate privacy policy
-        # Use AllowLinkingAccountAddresses to allow spending from different pools
-        privacy_policy = "AllowLinkingAccountAddresses"
-        
-        # Use minconf=0 for testing (allows unconfirmed funds)
-        # In production, you might want minconf=1 or higher
-        operation_id = zcash_wallet.z_sendmany(
-            from_address=sending_address,
-            recipients=recipients,
-            minconf=1,  # Allow unconfirmed funds for testing
-            privacy_policy=privacy_policy
-        )
-        
-        # Deduct from user's balance (in development mode)
-        zcash_wallet.deduct_user_balance(sending_address, cashout_request.amount)
-        
-        return schemas.CashoutResponse(
-            message="Cashout transaction submitted successfully",
-            transaction_id=operation_id,
-            recipient_address=cashout_request.recipient_address,
-            amount=cashout_request.amount,
+        # Create withdrawal transaction record
+        transaction = transaction_service.process_withdrawal(
+            user_id=current_user.id,
+            amount=formatted_amount,
+            to_address=cashout_request.recipient_address,
+            address_type=address_type,
             memo=cashout_request.memo
         )
+        
+        try:
+            # Prepare transaction using z_sendmany for shielded sending
+            recipients = [{
+                "address": cashout_request.recipient_address,
+                "amount": formatted_amount
+            }]
+            
+            # Add memo if provided and recipient supports it (shielded address)
+            if cashout_request.memo and cashout_request.recipient_address.startswith('z'):
+                recipients[0]["memo"] = cashout_request.memo
+            
+            # Send the transaction with appropriate privacy policy
+            privacy_policy = "AllowLinkingAccountAddresses"
+            
+            operation_id = zcash_wallet.z_sendmany(
+                from_address=sending_address,
+                recipients=recipients,
+                minconf=1,
+                privacy_policy=privacy_policy
+            )
+            
+            # Update transaction with operation ID and confirm it
+            transaction.operation_id = operation_id
+            transaction_service.confirm_transaction(transaction.id, operation_id)
+            
+            # Deduct from user's balance (in development mode)
+            zcash_wallet.deduct_user_balance(sending_address, cashout_request.amount)
+            
+            return schemas.CashoutResponse(
+                message="Cashout transaction submitted successfully",
+                transaction_id=operation_id,
+                recipient_address=cashout_request.recipient_address,
+                amount=cashout_request.amount,
+                memo=cashout_request.memo
+            )
+            
+        except Exception as zcash_error:
+            # If Zcash transaction fails, mark our transaction as failed
+            transaction_service.fail_transaction(transaction.id, str(zcash_error))
+            raise HTTPException(status_code=500, detail=f"Zcash transaction failed: {str(zcash_error)}")
         
     except HTTPException:
         raise
@@ -1499,3 +1529,273 @@ def get_user_event_status(
     except Exception as e:
         print(f"Error fetching user status for event {event_id}: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to fetch user event status")
+
+
+# Transaction Tracking Endpoints
+
+@app.get("/api/users/me/balance", response_model=schemas.UserBalanceSummary)
+def get_user_balance_summary(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Get comprehensive user balance summary with transaction history"""
+    try:
+        transaction_service = TransactionService(db)
+        balance_summary = transaction_service.get_user_balance_summary(current_user.id)
+        return balance_summary
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get balance summary: {str(e)}")
+
+
+@app.get("/api/users/me/transactions", response_model=schemas.TransactionHistoryResponse)
+def get_user_transactions(
+    request: schemas.TransactionHistoryRequest = Depends(),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Get user transaction history with filtering"""
+    try:
+        transaction_service = TransactionService(db)
+        
+        # Convert string transaction types to enum values
+        transaction_types = None
+        if request.transaction_types:
+            transaction_types = [
+                models.TransactionType(t) for t in request.transaction_types
+                if t in [e.value for e in models.TransactionType]
+            ]
+        
+        # Parse dates if provided
+        start_date = None
+        end_date = None
+        if request.start_date:
+            start_date = datetime.fromisoformat(request.start_date.replace('Z', '+00:00'))
+        if request.end_date:
+            end_date = datetime.fromisoformat(request.end_date.replace('Z', '+00:00'))
+        
+        transactions = transaction_service.get_user_transactions(
+            user_id=current_user.id,
+            transaction_types=transaction_types,
+            limit=request.limit,
+            offset=request.offset,
+            start_date=start_date,
+            end_date=end_date
+        )
+        
+        # Convert to response format
+        transaction_responses = []
+        for tx in transactions:
+            transaction_responses.append(schemas.TransactionResponse(
+                id=tx.id,
+                transaction_type=tx.transaction_type.value,
+                amount=tx.amount,
+                status=tx.status.value,
+                created_at=tx.created_at.isoformat() + 'Z',
+                confirmed_at=tx.confirmed_at.isoformat() + 'Z' if tx.confirmed_at else None,
+                description=tx.description,
+                from_address=tx.from_address,
+                to_address=tx.to_address,
+                from_address_type=tx.from_address_type.value if tx.from_address_type else None,
+                to_address_type=tx.to_address_type.value if tx.to_address_type else None,
+                shielded_balance_before=tx.shielded_balance_before,
+                transparent_balance_before=tx.transparent_balance_before,
+                shielded_balance_after=tx.shielded_balance_after,
+                transparent_balance_after=tx.transparent_balance_after,
+                zcash_transaction_id=tx.zcash_transaction_id,
+                operation_id=tx.operation_id,
+                block_height=tx.block_height,
+                confirmations=tx.confirmations,
+                network_fee=tx.network_fee,
+                sport_event_id=tx.sport_event_id,
+                bet_id=tx.bet_id,
+                payout_id=tx.payout_id
+            ))
+        
+        # Get total count for pagination
+        total_count = len(transaction_responses)  # Simplified for now
+        has_more = len(transactions) == request.limit
+        
+        return schemas.TransactionHistoryResponse(
+            transactions=transaction_responses,
+            total_count=total_count,
+            has_more=has_more
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get transaction history: {str(e)}")
+
+
+@app.post("/api/users/me/deposit", response_model=schemas.TransactionResponse)
+def process_user_deposit(
+    deposit_request: schemas.DepositRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Process a user deposit transaction"""
+    try:
+        transaction_service = TransactionService(db)
+        
+        # Convert address type string to enum
+        address_type = models.AddressType(deposit_request.address_type)
+        
+        transaction = transaction_service.process_deposit(
+            user_id=current_user.id,
+            amount=deposit_request.amount,
+            from_address=deposit_request.from_address,
+            zcash_transaction_id=deposit_request.zcash_transaction_id,
+            address_type=address_type,
+            confirmations=deposit_request.confirmations
+        )
+        
+        return schemas.TransactionResponse(
+            id=transaction.id,
+            transaction_type=transaction.transaction_type.value,
+            amount=transaction.amount,
+            status=transaction.status.value,
+            created_at=transaction.created_at.isoformat() + 'Z',
+            confirmed_at=transaction.confirmed_at.isoformat() + 'Z' if transaction.confirmed_at else None,
+            description=transaction.description,
+            from_address=transaction.from_address,
+            to_address=transaction.to_address,
+            from_address_type=transaction.from_address_type.value if transaction.from_address_type else None,
+            to_address_type=transaction.to_address_type.value if transaction.to_address_type else None,
+            shielded_balance_before=transaction.shielded_balance_before,
+            transparent_balance_before=transaction.transparent_balance_before,
+            shielded_balance_after=transaction.shielded_balance_after,
+            transparent_balance_after=transaction.transparent_balance_after,
+            zcash_transaction_id=transaction.zcash_transaction_id,
+            operation_id=transaction.operation_id,
+            block_height=transaction.block_height,
+            confirmations=transaction.confirmations,
+            network_fee=transaction.network_fee,
+            sport_event_id=transaction.sport_event_id,
+            bet_id=transaction.bet_id,
+            payout_id=transaction.payout_id
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to process deposit: {str(e)}")
+
+
+@app.post("/api/users/me/withdraw", response_model=schemas.TransactionResponse)
+def process_user_withdrawal(
+    withdrawal_request: schemas.WithdrawalRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Process a user withdrawal transaction"""
+    try:
+        transaction_service = TransactionService(db)
+        
+        # Convert address type string to enum
+        address_type = models.AddressType(withdrawal_request.address_type)
+        
+        transaction = transaction_service.process_withdrawal(
+            user_id=current_user.id,
+            amount=withdrawal_request.amount,
+            to_address=withdrawal_request.to_address,
+            address_type=address_type,
+            memo=withdrawal_request.memo
+        )
+        
+        # In a real implementation, you would initiate the actual Zcash transaction here
+        # For now, we'll just mark it as confirmed
+        transaction_service.confirm_transaction(transaction.id)
+        
+        return schemas.TransactionResponse(
+            id=transaction.id,
+            transaction_type=transaction.transaction_type.value,
+            amount=transaction.amount,
+            status=transaction.status.value,
+            created_at=transaction.created_at.isoformat() + 'Z',
+            confirmed_at=transaction.confirmed_at.isoformat() + 'Z' if transaction.confirmed_at else None,
+            description=transaction.description,
+            from_address=transaction.from_address,
+            to_address=transaction.to_address,
+            from_address_type=transaction.from_address_type.value if transaction.from_address_type else None,
+            to_address_type=transaction.to_address_type.value if transaction.to_address_type else None,
+            shielded_balance_before=transaction.shielded_balance_before,
+            transparent_balance_before=transaction.transparent_balance_before,
+            shielded_balance_after=transaction.shielded_balance_after,
+            transparent_balance_after=transaction.transparent_balance_after,
+            zcash_transaction_id=transaction.zcash_transaction_id,
+            operation_id=transaction.operation_id,
+            block_height=transaction.block_height,
+            confirmations=transaction.confirmations,
+            network_fee=transaction.network_fee,
+            sport_event_id=transaction.sport_event_id,
+            bet_id=transaction.bet_id,
+            payout_id=transaction.payout_id
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to process withdrawal: {str(e)}")
+
+
+@app.post("/api/admin/reconcile-balances", response_model=schemas.BalanceReconciliationResponse)
+def run_balance_reconciliation(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Run balance reconciliation for all users (admin only)"""
+    try:
+        # TODO: Add admin permission check
+        
+        reconciliation_service = BalanceReconciliationService(db)
+        reconciliation = reconciliation_service.run_full_reconciliation()
+        
+        return schemas.BalanceReconciliationResponse(
+            id=reconciliation.id,
+            reconciliation_date=reconciliation.reconciliation_date.isoformat() + 'Z',
+            total_users_checked=reconciliation.total_users_checked,
+            discrepancies_found=reconciliation.discrepancies_found,
+            total_shielded_pool_blockchain=reconciliation.total_shielded_pool_blockchain,
+            total_shielded_pool_database=reconciliation.total_shielded_pool_database,
+            total_transparent_pool_blockchain=reconciliation.total_transparent_pool_blockchain,
+            total_transparent_pool_database=reconciliation.total_transparent_pool_database,
+            reconciliation_status=reconciliation.reconciliation_status,
+            notes=reconciliation.notes
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to run reconciliation: {str(e)}")
+
+
+@app.get("/api/admin/reconciliations/{reconciliation_id}/users")
+def get_reconciliation_user_details(
+    reconciliation_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Get user-level reconciliation details (admin only)"""
+    try:
+        # TODO: Add admin permission check
+        
+        user_reconciliations = db.query(models.UserBalanceReconciliation).filter(
+            models.UserBalanceReconciliation.reconciliation_id == reconciliation_id
+        ).all()
+        
+        if not user_reconciliations:
+            raise HTTPException(status_code=404, detail="Reconciliation not found")
+        
+        response_data = []
+        for ur in user_reconciliations:
+            response_data.append(schemas.UserBalanceReconciliationResponse(
+                id=ur.id,
+                user_id=ur.user_id,
+                database_shielded_balance=ur.database_shielded_balance,
+                database_transparent_balance=ur.database_transparent_balance,
+                calculated_shielded_balance=ur.calculated_shielded_balance,
+                calculated_transparent_balance=ur.calculated_transparent_balance,
+                shielded_discrepancy=ur.shielded_discrepancy,
+                transparent_discrepancy=ur.transparent_discrepancy,
+                has_discrepancy=ur.has_discrepancy,
+                discrepancy_resolved=ur.discrepancy_resolved,
+                resolution_notes=ur.resolution_notes,
+                resolved_at=ur.resolved_at.isoformat() + 'Z' if ur.resolved_at else None
+            ))
+        
+        return response_data
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get reconciliation details: {str(e)}")

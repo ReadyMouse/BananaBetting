@@ -14,7 +14,11 @@ class User(UserBase):
     zcash_account: str
     zcash_address: str
     zcash_transparent_address: str
-    balance: str
+    balance: str  # Legacy field
+    shielded_balance: float = 0.0
+    transparent_balance: float = 0.0
+    last_balance_update: str
+    balance_version: int
 
     class Config:
         from_attributes = True
@@ -301,6 +305,143 @@ class NonProfitResponse(NonProfitBase):
     is_verified: bool = False
     is_active: bool = True
     verification_notes: str | None = None
+    
+    class Config:
+        from_attributes = True
+
+
+# Transaction tracking schemas
+class TransactionResponse(BaseModel):
+    """Schema for transaction responses"""
+    id: int
+    transaction_type: str
+    amount: float
+    status: str
+    created_at: str
+    confirmed_at: str | None = None
+    description: str | None = None
+    
+    # Address information
+    from_address: str | None = None
+    to_address: str | None = None
+    from_address_type: str | None = None
+    to_address_type: str | None = None
+    
+    # Balance tracking
+    shielded_balance_before: float
+    transparent_balance_before: float
+    shielded_balance_after: float
+    transparent_balance_after: float
+    
+    # Blockchain details
+    zcash_transaction_id: str | None = None
+    operation_id: str | None = None
+    block_height: int | None = None
+    confirmations: int = 0
+    network_fee: float = 0.0
+    
+    # Related entities
+    sport_event_id: int | None = None
+    bet_id: int | None = None
+    payout_id: int | None = None
+    
+    class Config:
+        from_attributes = True
+
+
+class UserBalanceSummary(BaseModel):
+    """Schema for user balance summary"""
+    user_id: int
+    shielded_balance: float
+    transparent_balance: float
+    total_balance: float
+    pending_debits: float
+    pending_credits: float
+    available_balance: float
+    last_balance_update: str
+    balance_version: int
+    recent_transactions: list[dict]
+    
+    class Config:
+        from_attributes = True
+
+
+class TransactionHistoryRequest(BaseModel):
+    """Schema for transaction history requests"""
+    transaction_types: list[str] | None = None
+    limit: int = 100
+    offset: int = 0
+    start_date: str | None = None
+    end_date: str | None = None
+    
+    class Config:
+        from_attributes = True
+
+
+class TransactionHistoryResponse(BaseModel):
+    """Schema for transaction history responses"""
+    transactions: list[TransactionResponse]
+    total_count: int
+    has_more: bool
+    
+    class Config:
+        from_attributes = True
+
+
+class DepositRequest(BaseModel):
+    """Schema for deposit requests"""
+    amount: float
+    from_address: str
+    zcash_transaction_id: str
+    address_type: str = "transparent"
+    confirmations: int = 1
+    
+    class Config:
+        from_attributes = True
+
+
+class WithdrawalRequest(BaseModel):
+    """Schema for withdrawal requests"""
+    amount: float
+    to_address: str
+    address_type: str = "transparent"
+    memo: str | None = None
+    
+    class Config:
+        from_attributes = True
+
+
+class BalanceReconciliationResponse(BaseModel):
+    """Schema for balance reconciliation responses"""
+    id: int
+    reconciliation_date: str
+    total_users_checked: int
+    discrepancies_found: int
+    total_shielded_pool_blockchain: float
+    total_shielded_pool_database: float
+    total_transparent_pool_blockchain: float
+    total_transparent_pool_database: float
+    reconciliation_status: str
+    notes: str | None = None
+    
+    class Config:
+        from_attributes = True
+
+
+class UserBalanceReconciliationResponse(BaseModel):
+    """Schema for user balance reconciliation responses"""
+    id: int
+    user_id: int
+    database_shielded_balance: float
+    database_transparent_balance: float
+    calculated_shielded_balance: float
+    calculated_transparent_balance: float
+    shielded_discrepancy: float
+    transparent_discrepancy: float
+    has_discrepancy: bool
+    discrepancy_resolved: bool
+    resolution_notes: str | None = None
+    resolved_at: str | None = None
     
     class Config:
         from_attributes = True

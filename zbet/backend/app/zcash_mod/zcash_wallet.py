@@ -730,6 +730,92 @@ def get_user_balance_by_address(address: str) -> float:
             # Other address types, try transparent method
             return get_transparent_address_balance(address)
 
+def get_combined_user_balance(transparent_address: str, shielded_address: str) -> dict:
+    """
+    Get combined balance for a specific user's transparent and shielded addresses.
+    
+    Args:
+        transparent_address: User's specific transparent address (t-address)
+        shielded_address: User's specific shielded address (z-address or u-address)
+    
+    Returns:
+        Dictionary with transparent_balance, shielded_balance, and total_balance for this user only
+    """
+    if DISABLE_ZCASH_NODE:
+        # In dev mode, return mock balances
+        transparent_balance = _mock_user_balances.get(transparent_address, 0.0001)
+        shielded_balance = _mock_user_balances.get(shielded_address, 0.01644)
+        return {
+            "transparent_balance": transparent_balance,
+            "shielded_balance": shielded_balance,
+            "total_balance": transparent_balance + shielded_balance
+        }
+    
+    try:
+        # Get transparent balance for the specific t-address
+        transparent_balance = 0.0
+        if transparent_address and transparent_address.startswith('t'):
+            transparent_balance = get_transparent_address_balance(transparent_address)
+        
+        # Get shielded balance for the specific shielded address
+        shielded_balance = 0.0
+        if shielded_address:
+            if shielded_address.startswith('z'):
+                # For z-addresses (Sapling), use z_getbalance for the specific address
+                shielded_balance = z_getbalance_for_address(shielded_address)
+            elif shielded_address.startswith('u'):
+                # For unified addresses, we need to check if this specific address has balance
+                # Since unified addresses can contain multiple receiver types, we need to
+                # check the balance associated with this specific unified address
+                try:
+                    # Try to get balance for this specific unified address
+                    # Note: This might require the address to be in the wallet
+                    payload = {
+                        "jsonrpc": "1.0",
+                        "id": "z_getbalance",
+                        "method": "z_getbalance",
+                        "params": [shielded_address, 1]  # address, minconf
+                    }
+                    
+                    response = requests.post(ZCASH_RPC_URL, json=payload, auth=(ZCASH_RPC_USER, ZCASH_RPC_PASSWORD))
+                    
+                    if response.status_code == 200:
+                        result = response.json()
+                        if result.get('result') is not None and not result.get('error'):
+                            shielded_balance = float(result['result'])
+                        else:
+                            print(f"z_getbalance error for unified address: {result.get('error')}")
+                            # Fallback: if the specific address query fails, 
+                            # this might mean the address isn't in the wallet or has no balance
+                            shielded_balance = 0.0
+                    else:
+                        print(f"HTTP error querying unified address balance: {response.status_code}")
+                        shielded_balance = 0.0
+                        
+                except Exception as e:
+                    print(f"Error getting unified address balance: {e}")
+                    shielded_balance = 0.0
+        
+        total_balance = transparent_balance + shielded_balance
+        
+        print(f"User balance - T-addr: {transparent_address} = {transparent_balance}, "
+              f"Shielded-addr: {shielded_address} = {shielded_balance}, Total: {total_balance}")
+        
+        return {
+            "transparent_balance": transparent_balance,
+            "shielded_balance": shielded_balance,
+            "total_balance": total_balance
+        }
+        
+    except Exception as e:
+        print(f"Error getting combined user balance: {e}")
+        # Return zero balances on error
+        return {
+            "transparent_balance": 0.0,
+            "shielded_balance": 0.0,
+            "total_balance": 0.0
+        }
+
 def deduct_user_balance(address: str, amount: float) -> None:
     """Deduct amount from user's balance (dev mode only)."""
     if DISABLE_ZCASH_NODE:

@@ -75,6 +75,7 @@ def validate_bet_for_event(sport_event: models.SportEvent, predicted_outcome: st
     
     # Check user balance if db and user_id are provided
     if db is not None and user_id is not None:
+        from .transaction_service import TransactionService
         from .zcash_mod import zcash_wallet
         
         # Get user to check balance
@@ -82,15 +83,27 @@ def validate_bet_for_event(sport_event: models.SportEvent, predicted_outcome: st
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
         
-        # Check user's balance using their Zcash address
-        user_address = user.zcash_transparent_address or user.zcash_address
-        if user_address:
-            current_balance = zcash_wallet.get_user_balance_by_address(user_address)
-            if current_balance < amount:
+        # Use transaction service for accurate balance checking
+        try:
+            transaction_service = TransactionService(db)
+            balance_summary = transaction_service.get_user_balance_summary(user_id)
+            available_balance = balance_summary["available_balance"]
+            
+            if available_balance < amount:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Insufficient balance. Available: {current_balance:.4f} ZEC, Required: {amount:.4f} ZEC"
+                    detail=f"Insufficient balance. Available: {available_balance:.4f} ZEC, Required: {amount:.4f} ZEC"
                 )
+        except Exception as e:
+            # Fallback to legacy balance checking if transaction service fails
+            user_address = user.zcash_transparent_address or user.zcash_address
+            if user_address:
+                current_balance = zcash_wallet.get_user_balance_by_address(user_address)
+                if current_balance < amount:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Insufficient balance. Available: {current_balance:.4f} ZEC, Required: {amount:.4f} ZEC"
+                    )
     
     # Add betting system-specific validations here in the future
     # For example, checking minimum/maximum bet amounts, etc.
@@ -98,10 +111,21 @@ def validate_bet_for_event(sport_event: models.SportEvent, predicted_outcome: st
 
 def process_bet_placement(db: Session, bet: models.Bet, sport_event: models.SportEvent):
     """Process betting system-specific logic after a bet is placed"""
-    # Process balance deduction
+    from .transaction_service import TransactionService
     from .zcash_mod import zcash_wallet
     
-    # Get user and deduct balance
+    # Initialize transaction service
+    transaction_service = TransactionService(db)
+    
+    # Create transaction record for bet placement
+    transaction = transaction_service.process_bet_placement(
+        user_id=bet.user_id,
+        bet_id=bet.id,
+        amount=bet.amount,
+        sport_event_id=sport_event.id
+    )
+    
+    # Legacy balance deduction for development mode compatibility
     user = db.query(models.User).filter(models.User.id == bet.user_id).first()
     if user:
         user_address = user.zcash_transparent_address or user.zcash_address

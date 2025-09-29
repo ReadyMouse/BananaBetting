@@ -146,13 +146,20 @@ def send_zcash(transaction: schemas.Transaction, current_user: models.User = Dep
 
 @app.get("/zcash/balance/")
 def get_balance(current_user: models.User = Depends(get_current_user)):
-    """Get current user's Zcash balance"""
+    """Get current user's Zcash balance (combined transparent and shielded)"""
     try:
-        balance = zcash_wallet.get_transparent_address_balance(current_user.zcash_transparent_address)
+        # Get combined balance from both transparent and shielded addresses
+        balance_info = zcash_wallet.get_combined_user_balance(
+            current_user.zcash_transparent_address,
+            current_user.zcash_address
+        )
+        
         return {
             "address": current_user.zcash_address,
             "transparent_address": current_user.zcash_transparent_address,
-            "balance": balance
+            "balance": balance_info["total_balance"],
+            "transparent_balance": balance_info["transparent_balance"],
+            "shielded_balance": balance_info["shielded_balance"]
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

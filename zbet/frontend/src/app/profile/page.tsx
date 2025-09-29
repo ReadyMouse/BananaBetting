@@ -406,14 +406,26 @@ export default function ProfilePage() {
                   {/* Balance Card */}
                   <div className="bg-gradient-to-r from-banana-400 to-banana-500 rounded-xl p-6 text-white mb-6">
                     <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-banana-100 mb-1">Current Balance</p>
-                        <p className="text-3xl font-bold">{formatZcash(walletData.balance)}</p>
+                      <div className="flex-1">
+                        <p className="text-banana-100 mb-1">Total Balance</p>
+                        <p className="text-3xl font-bold mb-4">{formatZcash(walletData.balance)}</p>
+                        
+                        {/* Balance Breakdown */}
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="bg-white/10 rounded-lg p-3">
+                            <p className="text-banana-100 text-sm mb-1">Transparent</p>
+                            <p className="text-lg font-semibold">{formatZcash(user?.transparent_balance || 0)}</p>
+                          </div>
+                          <div className="bg-white/10 rounded-lg p-3">
+                            <p className="text-banana-100 text-sm mb-1">Shielded</p>
+                            <p className="text-lg font-semibold">{formatZcash(user?.shielded_balance || 0)}</p>
+                          </div>
+                        </div>
                       </div>
                       <button
                         onClick={handleRefreshBalance}
                         disabled={refreshingBalance}
-                        className="p-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="p-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ml-4"
                       >
                         <RefreshCw size={24} className={refreshingBalance ? 'animate-spin' : ''} />
                       </button>

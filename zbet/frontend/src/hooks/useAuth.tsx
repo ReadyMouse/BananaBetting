@@ -90,12 +90,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       const balanceData = await zcashApi.refreshBalance();
       
-      // Update user with new balance
+      // Update user with new balance information
       setUser(prevUser => {
         if (!prevUser) return null;
         return {
           ...prevUser,
-          balance: balanceData.balance.toString()
+          balance: balanceData.balance.toString(),
+          transparent_balance: balanceData.transparent_balance,
+          shielded_balance: balanceData.shielded_balance
         };
       });
     } catch (error) {
