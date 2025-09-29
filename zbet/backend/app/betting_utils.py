@@ -95,15 +95,14 @@ def validate_bet_for_event(sport_event: models.SportEvent, predicted_outcome: st
                     detail=f"Insufficient balance. Available: {available_balance:.4f} ZEC, Required: {amount:.4f} ZEC"
                 )
         except Exception as e:
-            # Fallback to legacy balance checking if transaction service fails
-            user_address = user.zcash_transparent_address or user.zcash_address
-            if user_address:
-                current_balance = zcash_wallet.get_user_balance_by_address(user_address)
-                if current_balance < amount:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Insufficient balance. Available: {current_balance:.4f} ZEC, Required: {amount:.4f} ZEC"
-                    )
+            print(f"TransactionService failed, using unified balance: {e}")
+            # Use unified balance (shielded + transparent) instead of legacy transparent-only check
+            unified_balance = user.get_total_balance()
+            if unified_balance < amount:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Insufficient balance. Available: {unified_balance:.4f} ZEC, Required: {amount:.4f} ZEC"
+                )
     
     # Add betting system-specific validations here in the future
     # For example, checking minimum/maximum bet amounts, etc.
