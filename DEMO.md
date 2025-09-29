@@ -142,12 +142,6 @@ Then we can see results of other validators.
 ![Screenshot of the post-submission validation page](screenshots/event_closed.png)
 ![screenshots of the post-submission validation page 2](screenshots/event_validation_results.png)
 
-## [Admin] Settling the Bets + Preview of Payouts 
-
-![Screenshot of the payouts page with events ready to settle]
-
-![Screenshot of the payputs page with the preview for review]
-
 ## [Admin] Payouts
 
 Now that the event is settled, and the consensus reached it's time to payout the winners. In a real system, this would be automated. In this hackathon system, I have to push the buttons. The event is processed in a single, z_sendmany transcation.
