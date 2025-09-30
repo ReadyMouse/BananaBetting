@@ -33,6 +33,8 @@ This project was created for the [**2025 ZecHub Hackathon**](https://hackathon.z
 - **RESTful API**: Clean, documented API endpoints
 - **Security**: Password hashing, token-based authentication
 
+![project vision graphcs](screenshots/ov2_graphic.png)
+
 ## 🛠️ Prerequisites
 
 - **Python 3.8+**
