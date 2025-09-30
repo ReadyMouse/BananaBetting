@@ -162,9 +162,13 @@ Going from OPID to transaction hash:
 
 ![screenshot of blockexplorer](screenshots/payout_success_blockexplorer.png)
 
-Checking "The House"'s Zashi account 
+Checking "The House"'s Zashi account: 
 
 ![screenshot of my transaction in Zashi](screenshots/payout_house_zashi.png)
+
+Since I'm friends with [Tech learning Collective](https://techlearningcollective.com/) I asked them to check their wallet, and send over a screenshot. Grainy, but here it is. No banana for scale. 
+
+![screenshot of TLC's wallet](screenshots/payout_TLC.jpeg)
 
 Wait a minute...why are there only 2 blockchain transactions (1 private, 1 public) if we really have 7? Since this is a custodial situation, the Event Creator and Validators get the money deposited into their Banana Betting accounts. This is an internal database update, and not a blockchain transaction. They would need to cash out their balance from Banana Betting's wallet to their own self-custody wallet. 
 

@@ -1,6 +1,6 @@
 # 🍌 BananaBetting - Hackathon Sports Betting App for Charity
 
-Inspired by the Savanah Bannanas and Banana-ball, the dancing alternative to baseball. BananaBetting is a fun, Zcash-powered sports betting platform, all to benefit charities. Sports betting for the rest of us. Find Screenshots and Demostrations at [DEMO.md](DEMO.md)
+Inspired by the Savannah Bananas and Banana-ball, the dancing alternative to baseball. BananaBetting is a fun, Zcash-powered sports betting platform, all to benefit charities. Sports betting for the rest of us. Find Screenshots and Demonstrations at [DEMO.md](DEMO.md)
 
 Ready Mouse zcash address: u18k2wk6dk9qarekd03v8qgy29qhxp9jag6mmkvvspwrszp0sd48mv043nsfha8vx763432x2gymnu7pvzku6n6ptve5tlvfa7wgq9vf6vzwkt7q3wweju3th2y3ldkjxdst78hlww38en64zljse55gz37s2dkxxqn8p0q3xxf5jj9rqk
 
@@ -10,22 +10,22 @@ This project was created for the [**2025 ZecHub Hackathon**](https://hackathon.z
 
 ## 🎯 Project Overview
 
-**BananaBetting** transforms traditional fundraising and charity donations into an interactive, sports betting experience:
+**BananaBetting** transforms traditional fundraising and charity donations into an interactive, sports betting experience while also providing remote work opportunities for community validators:
 
 ![Overview of the system graphic](screenshots/ov1_graphic.png)
 
-- **Charities** -> Join our database of crypto-accepting 503(c) Non-profits
-- **Organizations** + Influencers -> Create events to bet on
+- **Charities** -> Join our database of crypto-accepting 501(c)(3) Non-profits
+- **Organizations + Influencers** -> Create events to bet on
 - **Betters** -> Bet on the outcome of fun events 
-- **Validators** -> Manual determine the outcome of events 
-- **BananaBetting** -> Resolves all transcations, pays out Charities, event creators, and validators 
+- **Validators** -> Manually determine the outcome of events 
+- **BananaBetting** -> Resolves all transactions, pays out Charities, event creators, and validators 
 
-## Transparent + Sheilded Transcations
-- **Private transcation** -> to pay the indidividual validators and events creators
-- **Public transcation** -> to pay the charities with a clear paper trail 
+## Transparent + Shielded Transactions
+- **Private transaction** -> to pay the individual validators and event creators
+- **Public transaction** -> to pay the charities with a clear paper trail 
 
 ## 🚀 Core Features
-- **Charity Betting**: A pari-mutel betting system for charity and remote work opportunities
+- **Charity Betting**: A pari-mutuel betting system for charity and remote work opportunities
 - **User Authentication**: Secure JWT-based authentication system
 - **Zcash Integration**: Direct integration with Zcash node via RPC
 - **Transaction Management**: Send Zcash public + private transactions with validation
@@ -36,20 +36,20 @@ This project was created for the [**2025 ZecHub Hackathon**](https://hackathon.z
 ## 🛠️ Prerequisites
 
 - **Python 3.8+**
-- **Zcash Node**: Running Zcash daemon with RPC enabled
+- **Zcash Node**: Running Zcash daemon with RPC enabled (zcashd)
 - **Git**
 
 ## 🚀 Quick Start
 
 ### 0. Have a Zcash Node Running
-This functional demostation used zcashd for server operations. 
+This functional demonstration used zcashd for server operations. 
 - [General docs for running nodes](https://github.com/zecrocks/zcash-stack)
 - [Example zcashd docker compose file](https://github.com/fabacab/zcash-stack/blob/35b14dc847f5af8c889ad257c1749efcf123fde2/docker/compose.zcashd.yaml) 
 - [Pending PR to zcash-stack](https://github.com/fabacab/zcash-stack/commit/35b14dc847f5af8c889ad257c1749efcf123fde2)
 
 Ensure your `zcashd` node is configured with JSON RPC access, including `disable-wallet=0` and synchronized before using the transaction features. This may require turning on `--exportdir` to save out the recovery keys of the wallet features in the node. This can be turned off once the keys have been saved, and the acknowledgement of the keys is complete. 
 
-Note: Lightwallets (ligthwalletd, zebrad) do not allow the wallet account features needed for this betting system. At the time of writing, Zaino was not ready for production. 
+Note: Lightwallets (lightwalletd, zebrad) do not allow the wallet account features needed for this betting system. At the time of writing, Zaino was not ready for production. 
 
 ### 1. Clone the Repository
 
@@ -67,8 +67,8 @@ ZCASH_RPC_PASSWORD = "your_rpc_password"
 ZCASH_RPC_URL = "http://127.0.0.1:8232/"
 ```
 
-Set pool and house addresses: 
-`zbet/backend/.env`
+Set pool and house addresses in: 
+`zbet/backend/.env` (copy from `env.example`)
 
 ### 3. Launch the API
 
@@ -76,7 +76,8 @@ Set pool and house addresses:
 ./launch.sh
 ```
 
-The API will be available at: **http://localhost:3000**
+The frontend will be available at: **http://localhost:3000**
+The API will be available at: **http://localhost:8000**
 
 ## 🏗️ Architecture 
 
@@ -115,11 +116,11 @@ BananaBetting follows a **full-stack web architecture** with **blockchain integr
 6. **Transparency** → Public transactions for charity payments, private for users
 
 Note: There are many things that require button clicks at the moment, but would otherwise be automated systems running at regular intervals. Things like:
-- Auto-sheilding funds in t-addresses into the sheilded pool
+- Auto-shielding funds in t-addresses into the shielded pool
 - Processing the payouts once the consensus threshold is met by a betting event
 - Automatically setting the settlement date 
 - Scaling the # of validators based on pool side (low value betting event needs less validators)
-- Incentitizing betting events close to settlement but below consensus threshold with bonus rewards
+- Incentivizing betting events close to settlement but below consensus threshold with bonus rewards
 
 ### Key Architectural Decisions
 - **Pari-Mutuel Betting**: Winners split losers' pot proportionally
@@ -127,6 +128,10 @@ Note: There are many things that require button clicks at the moment, but would 
 - **Batch Processing**: Efficient `z_sendmany` for multiple payouts
 - **JWT Authentication**: Stateless session management
 - **RESTful API**: Clean separation between frontend and backend
+
+Why isn't it completely defi? Because Zcash doesn't have smart contracts. 
+
+The absence of smart contracts fundamentally prevents this charity betting application from achieving true DeFi architecture because it requires centralized custody and trusted execution at every critical stage. Without smart contracts, user funds must be held by a centralized custodian rather than locked in trustless escrow, bet settlement relies on off-chain computation by a trusted operator rather than autonomous on-chain execution, and payout distribution cannot be cryptographically enforced — users must trust the operator to correctly calculate and distribute winnings. The betting rules, odds calculations, and payout formulas exist only in off-chain application logic instead of being transparently encoded and immutably verifiable on-chain. This results in a Web2 application with blockchain payment rails rather than a genuine DeFi protocol, as the core financial logic—escrow, settlement, and distribution—remains centralized, permissioned, and trust-dependent instead of trustless, permissionless, and autonomously executable through verifiable on-chain code.
 
 ## 💻 Tech Stack
 
@@ -171,13 +176,6 @@ Note: There are many things that require button clicks at the moment, but would 
 | **SQLite** | Local database for development/hackathon |
 | **Alembic** | Database migration management |
 
-### Development & Deployment
-| Technology | Purpose |
-|------------|---------|
-| **Python 3.8+** | Backend runtime |
-| **Node.js** | Frontend build system |
-| **ESLint** | Code linting and formatting |
-| **Git** | Version control |
 
 ## 🗂️ Project Structure
 
@@ -192,6 +190,7 @@ BananaBetting/
 │   │   │   │   └── __init__.py     # RPC configuration
 │   │   │   ├── main.py         # Main API application
 │   │   │   ├── main_transactions.py # Transaction endpoints
+│   │   │   ├── transaction_service.py # Transaction service layer
 │   │   │   ├── auth.py         # JWT authentication
 │   │   │   ├── models.py       # SQLAlchemy database models
 │   │   │   ├── schemas.py      # Pydantic request/response schemas
@@ -199,10 +198,11 @@ BananaBetting/
 │   │   │   ├── betting_utils.py # Betting logic utilities
 │   │   │   ├── config.py       # Application configuration
 │   │   │   ├── database.py     # Database configuration
-│   │   │   └── serializers.py  # Data serialization
+│   │   │   ├── serializers.py  # Data serialization
+│   │   │   └── cleaners.py     # Data cleaning utilities
 │   │   ├── tests/              # Backend test suite
-│   │   ├── scripts/            # Database migration scripts
-│   │   ├── seed_database.py    # Database seeding
+│   │   ├── scripts/            # Utility scripts
+│   │   ├── migrations/         # Database migration scripts
 │   │   ├── requirements.txt    # Python dependencies
 │   │   └── venv/               # Virtual environment
 │   └── frontend/               # Next.js frontend application
@@ -247,7 +247,7 @@ This project was created for the [**2025 ZecHub Hackathon**](https://hackathon.z
 - This is a proof-of-concept built for fun and to explore Zcash blockchain functionality
 - The developers assume no responsibility for any legal issues arising from the use of this software
 - Users are solely responsible for ensuring compliance with their local laws and regulations
-- Since wining bets are refunded and loser bets are resdistributed to charitires, this is potentially not under gambling restrictions
+- Since winning bets are refunded and loser bets are redistributed to charities, this is potentially not under gambling restrictions
 
 
 

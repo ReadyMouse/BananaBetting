@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# zSiren Launch Script
+# BananaBetting Launch Script
 # This script launches both the backend and frontend servers
 
 set -e  # Exit on any error
 
-echo "🚀 Starting zSiren Application..."
+echo "🚀 Starting BananaBetting Application..."
 echo "=================================="
 
 # Colors for output
@@ -138,7 +138,7 @@ fi
 FRONTEND_PID=$!
 
 # Display information
-echo -e "\n${GREEN}🎉 zSiren is now running!${NC}"
+echo -e "\n${GREEN}🎉 BananaBetting is now running!${NC}"
 echo -e "=================================="
 echo -e "${BLUE}📡 Backend API:${NC} http://localhost:8000"
 echo -e "${BLUE}📚 API Docs:${NC} http://localhost:8000/docs"
